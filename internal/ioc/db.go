@@ -12,7 +12,8 @@ import (
 )
 
 var DBFxOpt = fx.Provide(
-	InitDB,
+	InitBaseDB,
+	InitShardingDB,
 	fx.Annotate(
 		InitNotifShardingSharding,
 		fx.As(new(sharding.Strategy)),
@@ -24,7 +25,23 @@ var (
 	once sync.Once
 )
 
-func InitDB() *xsync.Map[string, *gorm.DB] {
+func InitBaseDB() *gorm.DB {
+	type dbConfig struct {
+		DSN string `mapstructure:"dsn"`
+	}
+	cfg := &dbConfig{}
+	if err := viper.UnmarshalKey("db.base", cfg); err != nil {
+		panic(err)
+	}
+
+	db, err := gorm.Open(mysql.Open(cfg.DSN), &gorm.Config{})
+	if err != nil {
+		panic(err)
+	}
+	return db
+}
+
+func InitShardingDB() *xsync.Map[string, *gorm.DB] {
 	type dbConfig struct {
 		DSN string `mapstructure:"dsn"`
 	}
@@ -32,7 +49,7 @@ func InitDB() *xsync.Map[string, *gorm.DB] {
 	type allDBConfig map[string]dbConfig
 	dbConfigs := make(allDBConfig)
 
-	if err := viper.UnmarshalKey("db.mysql", &dbConfigs); err != nil {
+	if err := viper.UnmarshalKey("db.sharding", &dbConfigs); err != nil {
 		panic(err)
 	}
 

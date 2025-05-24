@@ -7,6 +7,7 @@ require (
 	github.com/JrMarcco/jotify-api v0.0.1
 	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/golang-jwt/jwt/v5 v5.2.2
+	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/spf13/pflag v1.0.6
 	github.com/spf13/viper v1.20.1
 	github.com/stretchr/testify v1.10.0

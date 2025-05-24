@@ -25,8 +25,11 @@ func main() {
 		// 初始化 etcd
 		ioc.EtcdFxOpt,
 
-		// 初始化 DAO
-		ioc.DaoFxOpt,
+		// 初始化 Repo
+		ioc.RepoFxOpt,
+
+		// 初始化 Service
+		ioc.ServiceFxOpt,
 
 		// 初始化注册中心
 		ioc.RegistryFxOpt,

@@ -34,17 +34,17 @@ type Template struct {
 
 // Notification 消息领域对象
 type Notification struct {
-	Id             uint64             `json:"id"`
-	BizId          uint64             `json:"biz_id"`
-	BizKey         string             `json:"biz_key"`
-	Receivers      []string           `json:"receivers"`
-	Channel        Channel            `json:"channel"`
-	Template       Template           `json:"template"`
-	Status         SendStatus         `json:"status"`
-	ScheduledStart time.Time          `json:"scheduled_start"`
-	ScheduledEnd   time.Time          `json:"scheduled_end"`
-	Version        int32              `json:"version"`
-	StrategyConfig SendStrategyConfig `json:"strategy_config"`
+	Id             uint64           `json:"id"`
+	BizId          uint64           `json:"biz_id"`
+	BizKey         string           `json:"biz_key"`
+	Receivers      []string         `json:"receivers"`
+	Channel        Channel          `json:"channel"`
+	Template       Template         `json:"template"`
+	Status         SendStatus       `json:"status"`
+	ScheduledStart time.Time        `json:"scheduled_start"`
+	ScheduledEnd   time.Time        `json:"scheduled_end"`
+	Version        int32            `json:"version"`
+	StrategyConfig SendStrategyConf `json:"strategy_config"`
 }
 
 func (n *Notification) Validate() error {
@@ -90,6 +90,10 @@ func (n *Notification) ValidatedBizId() error {
 	return nil
 }
 
+// SetSendTime 设置消息发送时间窗口
+//
+// 计算消息发送时间窗口并设置窗口开始时间、窗口结束时间。
+// 通过调度任务将消息在时间窗口内发出。
 func (n *Notification) SetSendTime() {
 	start, end := n.StrategyConfig.CalcTimeWindow()
 	n.ScheduledStart = start
@@ -169,7 +173,7 @@ func getDomainChannel(n *notificationv1.Notification) (Channel, error) {
 	}
 }
 
-func getDomainStrategyConfig(n *notificationv1.Notification) (SendStrategyConfig, error) {
+func getDomainStrategyConfig(n *notificationv1.Notification) (SendStrategyConf, error) {
 	var strategy SendStrategy
 	var delaySeconds int64
 	var scheduleAt time.Time
@@ -187,14 +191,14 @@ func getDomainStrategyConfig(n *notificationv1.Notification) (SendStrategyConfig
 				delaySeconds = st.Delayed.DelaySeconds
 				break
 			}
-			return SendStrategyConfig{}, fmt.Errorf("%w", errs.ErrInvalidSendStrategy)
+			return SendStrategyConf{}, fmt.Errorf("%w", errs.ErrInvalidSendStrategy)
 		case *notificationv1.SendStrategy_Scheduled:
 			if st.Scheduled != nil && st.Scheduled.SendTime != nil {
 				strategy = SendStrategyScheduled
 				scheduleAt = st.Scheduled.SendTime.AsTime()
 				break
 			}
-			return SendStrategyConfig{}, fmt.Errorf("%w", errs.ErrInvalidSendStrategy)
+			return SendStrategyConf{}, fmt.Errorf("%w", errs.ErrInvalidSendStrategy)
 		case *notificationv1.SendStrategy_TimeWindow:
 			if st.TimeWindow != nil {
 				strategy = SendStrategyTimeWindow
@@ -202,20 +206,20 @@ func getDomainStrategyConfig(n *notificationv1.Notification) (SendStrategyConfig
 				endTime = st.TimeWindow.EndTimeMillis
 				break
 			}
-			return SendStrategyConfig{}, fmt.Errorf("%w", errs.ErrInvalidSendStrategy)
+			return SendStrategyConf{}, fmt.Errorf("%w", errs.ErrInvalidSendStrategy)
 		case *notificationv1.SendStrategy_Deadline:
 			if st.Deadline != nil {
 				strategy = SendStrategyDeadline
 				deadline = st.Deadline.Deadline.AsTime()
 				break
 			}
-			return SendStrategyConfig{}, fmt.Errorf("%w", errs.ErrInvalidSendStrategy)
+			return SendStrategyConf{}, fmt.Errorf("%w", errs.ErrInvalidSendStrategy)
 		default:
-			return SendStrategyConfig{}, fmt.Errorf("%w", errs.ErrInvalidSendStrategy)
+			return SendStrategyConf{}, fmt.Errorf("%w", errs.ErrInvalidSendStrategy)
 		}
 	}
 
-	return SendStrategyConfig{
+	return SendStrategyConf{
 		Type:       strategy,
 		Delay:      time.Duration(delaySeconds) * time.Second,
 		ScheduleAt: scheduleAt,

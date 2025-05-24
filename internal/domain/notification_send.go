@@ -22,8 +22,8 @@ const (
 	SendStrategyDeadline   SendStrategy = "deadline"
 )
 
-// SendStrategyConfig 发送策略配置
-type SendStrategyConfig struct {
+// SendStrategyConf 发送策略配置
+type SendStrategyConf struct {
 	Type       SendStrategy  `json:"type"`
 	Delay      time.Duration `json:"delay"`
 	ScheduleAt time.Time     `json:"schedule_at"`
@@ -33,7 +33,7 @@ type SendStrategyConfig struct {
 }
 
 // Validate 校验发送策略配置
-func (c SendStrategyConfig) Validate() error {
+func (c SendStrategyConf) Validate() error {
 	switch c.Type {
 	case SendStrategyImmediate:
 		return nil
@@ -61,7 +61,7 @@ func (c SendStrategyConfig) Validate() error {
 }
 
 // CalcTimeWindow 计算发送时间窗口
-func (c SendStrategyConfig) CalcTimeWindow() (start, end time.Time) {
+func (c SendStrategyConf) CalcTimeWindow() (start, end time.Time) {
 	switch c.Type {
 	case SendStrategyImmediate:
 		// immediately send

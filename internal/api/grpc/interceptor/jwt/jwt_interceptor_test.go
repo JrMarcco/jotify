@@ -50,7 +50,7 @@ func TestJwtAuth_Encode(t *testing.T) {
 			assert.NotEmpty(t, claims["iat"])
 			assert.NotEmpty(t, claims["exp"])
 
-			assert.Equal(t, "jotice", claims["iss"])
+			assert.Equal(t, "jotify", claims["iss"])
 		})
 	}
 }

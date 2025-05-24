@@ -10,7 +10,9 @@ app:
   write_weight: 1
 
 db:
-  mysql:
+  base:
+    dsn: "jrmarcco:<passwd>@tcp(192.168.3.3:3306)/jotify_0?charset=utf8mb4&collation=utf8mb4_general_ci&parseTime=True&loc=Local&timeout=1s&readTimeout=3s&writeTimeout=3s&multiStatements=true&interpolateParams=true"
+  sharding:
     jotify_0:
       dsn: "jrmarcco:<passwd>@tcp(192.168.3.3:3306)/jotify_0?charset=utf8mb4&collation=utf8mb4_general_ci&parseTime=True&loc=Local&timeout=1s&readTimeout=3s&writeTimeout=3s&multiStatements=true&interpolateParams=true"
     jotify_1:

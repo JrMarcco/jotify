@@ -39,7 +39,7 @@ func (tn *TxNotification) SetSendTime() {
 	tn.Notification.SetSendTime()
 }
 
-func (tn *TxNotification) SetNextCheckAtAndStatus(txNotifConfig *TxNotifConfig) {
+func (tn *TxNotification) SetNextCheckAtAndStatus(txNotifConfig *TxNotifConf) {
 	if next, ok := tn.nextCheck(txNotifConfig); ok {
 		tn.NextCheckBackAt = time.Now().Add(next).UnixMilli()
 		return
@@ -50,7 +50,7 @@ func (tn *TxNotification) SetNextCheckAtAndStatus(txNotifConfig *TxNotifConfig) 
 
 }
 
-func (tn *TxNotification) nextCheck(txNotifConfig *TxNotifConfig) (time.Duration, bool) {
+func (tn *TxNotification) nextCheck(txNotifConfig *TxNotifConf) (time.Duration, bool) {
 	if txNotifConfig == nil || txNotifConfig.RetryPolicy == nil {
 		return 0, false
 	}

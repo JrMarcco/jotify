@@ -34,7 +34,7 @@ func Builder(privateKey ed25519.PrivateKey, publicKey ed25519.PublicKey) *Interc
 func (b *InterceptorBuilder) Encode(customClaims jwt.MapClaims) (string, error) {
 	claims := jwt.MapClaims{
 		"iat": time.Now().Unix(),
-		"iss": "jotice",
+		"iss": "jotify",
 	}
 
 	maps.Copy(claims, customClaims)

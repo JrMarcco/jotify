@@ -120,3 +120,10 @@ func (d *DefaultSendService) BatchAsyncSend(ctx context.Context, ns []domain.Not
 
 	return domain.BatchAsyncSendResp{NotificationIds: ids}, nil
 }
+
+func NewDefaultSendService(idGenerator *snowflake.Generator, sendStrategy sendstrategy.SendStrategy) *DefaultSendService {
+	return &DefaultSendService{
+		idGenerator:  idGenerator,
+		sendStrategy: sendStrategy,
+	}
+}

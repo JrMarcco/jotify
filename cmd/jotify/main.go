@@ -16,8 +16,17 @@ func main() {
 		// 初始化 zap.Logger
 		ioc.LoggerFxOpt,
 
+		// 初始化雪花算法 id 生成器
+		ioc.IdFxOpt,
+
+		// 初始化数据库
+		ioc.DBFxOpt,
+
 		// 初始化 etcd
 		ioc.EtcdFxOpt,
+
+		// 初始化 DAO
+		ioc.DaoFxOpt,
 
 		// 初始化注册中心
 		ioc.RegistryFxOpt,

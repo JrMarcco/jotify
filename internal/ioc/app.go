@@ -27,7 +27,7 @@ type App struct {
 	registry registry.Registry
 	si       registry.ServiceInstance
 
-	zLogger *zap.Logger
+	logger *zap.Logger
 }
 
 func InitApp(grpcServer *grpc.Server, r registry.Registry, zLogger *zap.Logger) *App {
@@ -57,7 +57,7 @@ func InitApp(grpcServer *grpc.Server, r registry.Registry, zLogger *zap.Logger) 
 		timeout:    time.Duration(cfg.Timeout) * time.Millisecond,
 		registry:   r,
 		si:         si,
-		zLogger:    zLogger,
+		logger:     zLogger,
 	}
 }
 
@@ -98,7 +98,7 @@ func AppLifecycle(lc fx.Lifecycle, app *App) {
 
 				if err := app.registry.Unregister(unregisterCtx, app.si); err != nil {
 					// 记录错误但不返回，确保服务器能够正常关闭
-					app.zLogger.Error("[jotify] unregister service failed", zap.Error(err))
+					app.logger.Error("[jotify] unregister service failed", zap.Error(err))
 				}
 			}
 

@@ -1,5 +1,7 @@
 package domain
 
+import "github.com/JrMarcco/jotify/internal/pkg/retry"
+
 // BizConfig 业务配置领域对象
 type BizConfig struct {
 	Id             uint64

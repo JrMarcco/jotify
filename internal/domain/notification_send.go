@@ -10,6 +10,10 @@ import (
 // SendStrategy 发送策略
 type SendStrategy string
 
+func (s SendStrategy) String() string {
+	return string(s)
+}
+
 const (
 	SendStrategyImmediate  SendStrategy = "immediate"
 	SendStrategyDelayed    SendStrategy = "delayed"

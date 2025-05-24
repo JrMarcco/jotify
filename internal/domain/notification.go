@@ -100,7 +100,7 @@ func (n *Notification) IsImmediate() bool {
 	return n.StrategyConfig.Type == SendStrategyImmediate
 }
 
-// ReplaceAsyncImmediate replace the notification to be sent asynchronously
+// ReplaceAsyncImmediate 将立即发送消息转为异步发送消息，Deadline 为一分钟。
 func (n *Notification) ReplaceAsyncImmediate() {
 	if n.IsImmediate() {
 		n.StrategyConfig.Deadline = time.Now().Add(time.Minute)
@@ -124,7 +124,7 @@ func (n *Notification) marshal(val any) (string, error) {
 	return string(jsonBytes), nil
 }
 
-func NewNotificationFromApi(n *notificationv1.Notification) (Notification, error) {
+func NotificationFromApi(n *notificationv1.Notification) (Notification, error) {
 	if n == nil {
 		return Notification{}, fmt.Errorf("%w: notification is nil", errs.ErrInvalidParam)
 	}

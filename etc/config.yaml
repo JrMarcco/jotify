@@ -9,6 +9,12 @@ app:
   read_weight: 1
   write_weight: 1
 
+db:
+  mysql:
+    jotify_0:
+      dsn: "jrmarcco:<passwd>@tcp(192.168.3.3:3306)/jotify_0?charset=utf8mb4&collation=utf8mb4_general_ci&parseTime=True&loc=Local&timeout=1s&readTimeout=3s&writeTimeout=3s&multiStatements=true&interpolateParams=true"
+    jotify_1:
+      dsn: "jrmarcco:<passwd>@tcp(192.168.3.3:3306)/jotify_1?charset=utf8mb4&collation=utf8mb4_general_ci&parseTime=True&loc=Local&timeout=1s&readTimeout=3s&writeTimeout=3s&multiStatements=true&interpolateParams=true"
 
 etcd:
   username: "root"

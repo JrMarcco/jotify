@@ -1,0 +1,27 @@
+profile:
+  env: "dev"
+
+app:
+  name: "jotify"
+  addr: "0.0.0.0:50501"
+  group: "jotify"
+  timeout: 1000 # millisecond
+  read_weight: 1
+  write_weight: 1
+
+
+etcd:
+  username: "root"
+  password: "<root_passwd>"
+  endpoints:
+    - "192.168.3.3:2379"
+
+jwt:
+  private: |
+    -----BEGIN PRIVATE KEY-----
+    MC4CAQAwBQYDK2VwBCIEINuchwbkYeYD/jnGLyPjRAufQGP+WUckh+PK6U4u7fk1
+    -----END PRIVATE KEY-----
+  public: |
+    -----BEGIN PUBLIC KEY-----
+    MCowBQYDK2VwAyEA818wiIDR2aqxvLKcyQL2qvVCYlSs2A/izQi/K109rlU=
+    -----END PUBLIC KEY-----

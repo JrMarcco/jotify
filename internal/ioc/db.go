@@ -17,10 +17,12 @@ var DBFxOpt = fx.Provide(
 	fx.Annotate(
 		InitNotifShardingStrategy,
 		fx.As(new(sharding.Strategy)),
+		fx.ResultTags(`name:"notification_sharding_strategy"`),
 	),
 	fx.Annotate(
 		InitCbLogShardingStrategy,
 		fx.As(new(sharding.Strategy)),
+		fx.ResultTags(`name:"callback_log_sharding_strategy"`),
 	),
 )
 

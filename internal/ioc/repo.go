@@ -15,10 +15,12 @@ var RepoFxOpt = fx.Options(
 		fx.Annotate(
 			local.NewBizConfLocalCache,
 			fx.As(new(cache.BizConfCache)),
+			fx.ResultTags(`name:"biz_conf_local_cache"`),
 		),
 		fx.Annotate(
 			redis.NewBizConfRedisCache,
 			fx.As(new(cache.BizConfCache)),
+			fx.ResultTags(`name:"biz_conf_redis_cache"`),
 		),
 	),
 
@@ -32,7 +34,8 @@ var RepoFxOpt = fx.Options(
 		// notification sharding dao
 		fx.Annotate(
 			dao.NewNotifShardingDAO,
-			fx.As(new(dao.NotifShardingDAO)),
+			fx.As(new(dao.NotificationDAO)),
+			fx.ParamTags(`name:"notification_sharding_strategy"`, `name:"callback_log_sharding_strategy"`),
 		),
 	),
 

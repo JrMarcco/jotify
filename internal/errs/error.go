@@ -10,4 +10,6 @@ var (
 	ErrInvalidChannel             = errors.New("[jotify] invalid channel")
 	ErrInvalidSendStrategy        = errors.New("[jotify] invalid send strategy")
 	ErrNoAvailableFailoverService = errors.New("[jotify] no service needs to be take over")
+	ErrInsufficientQuota          = errors.New("[jotify] insufficient quota")
+	ErrFailedToCreateCallbackLog  = errors.New("[jotify] failed to create callback log")
 )

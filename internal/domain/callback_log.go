@@ -18,7 +18,7 @@ func (s CallbackStatus) String() string {
 type CallbackLog struct {
 	Id           uint64
 	Notification Notification
-	RetryTimes   int32
+	RetriedTimes int32
 	NextRetryAt  int64
 	Status       CallbackStatus
 }

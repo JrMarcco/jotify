@@ -19,9 +19,10 @@ func main() {
 		// 初始化雪花算法 id 生成器
 		ioc.IdFxOpt,
 
+		// 初始化 redis
+		ioc.RedisFxOpt,
 		// 初始化数据库
 		ioc.DBFxOpt,
-
 		// 初始化 etcd
 		ioc.EtcdFxOpt,
 

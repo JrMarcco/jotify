@@ -13,9 +13,9 @@ type BizConf struct {
 	OwnerId      uint64
 	OwnerType    string
 	ChannelConf  xsql.JsonColumn[domain.ChannelConf]
-	txNotifConf  xsql.JsonColumn[domain.TxNotifConf]
-	RateLimit    int
-	Quota        xsql.JsonColumn[domain.Quota]
+	TxNotifConf  xsql.JsonColumn[domain.TxNotifConf]
+	RateLimit    int32
+	QuotaConf    xsql.JsonColumn[domain.QuotaConf]
 	CallbackConf xsql.JsonColumn[domain.CallbackConf]
 	CreatedAt    int64
 	UpdatedAt    int64
@@ -26,7 +26,7 @@ func (bc BizConf) TableName() string {
 }
 
 type BizConfDAO interface {
-	GetById(ctx context.Context, id uint64) (domain.BizConf, error)
+	GetById(ctx context.Context, id uint64) (BizConf, error)
 }
 
 var _ BizConfDAO = (*DefaultBizConfDAO)(nil)
@@ -35,10 +35,14 @@ type DefaultBizConfDAO struct {
 	db *gorm.DB
 }
 
-func (d DefaultBizConfDAO) GetById(ctx context.Context, id uint64) (domain.BizConf, error) {
-	// 先从本地缓存获取
-	// TODO implement me
-	panic("implement me")
+func (d *DefaultBizConfDAO) GetById(ctx context.Context, id uint64) (BizConf, error) {
+	var bizConf BizConf
+
+	err := d.db.WithContext(ctx).Where("id = ?", id).First(&bizConf).Error
+	if err != nil {
+		return BizConf{}, err
+	}
+	return bizConf, nil
 }
 
 func NewDefaultBizConfDAO(db *gorm.DB) *DefaultBizConfDAO {

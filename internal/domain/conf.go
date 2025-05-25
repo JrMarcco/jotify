@@ -4,16 +4,16 @@ import "github.com/JrMarcco/jotify/internal/pkg/retry"
 
 // BizConf 业务配置领域对象
 type BizConf struct {
-	Id             uint64
-	OwnerId        uint64
-	OwnerType      string
-	ChannelConfig  *ChannelConf
-	TxNotifConfig  *TxNotifConf
-	RateLimit      int32
-	QuotaConfig    *QuotaConfig
-	CallbackConfig *CallbackConf
-	CreateAt       int64
-	UpdateAt       int64
+	Id           uint64
+	OwnerId      uint64
+	OwnerType    string
+	ChannelConf  *ChannelConf
+	TxNotifConf  *TxNotifConf
+	RateLimit    int32
+	QuotaConf    *QuotaConf
+	CallbackConf *CallbackConf
+	CreateAt     int64
+	UpdateAt     int64
 }
 
 // ChannelConf 渠道配置领域对象
@@ -42,8 +42,8 @@ type CallbackConf struct {
 	RetryPolicy *retry.Config `json:"retry_policy"`
 }
 
-// QuotaConfig 配额配置领域对象
-type QuotaConfig struct {
+// QuotaConf 配额配置领域对象
+type QuotaConf struct {
 	Daily   *DailyQuotaConf   `json:"daily"`
 	Monthly *MonthlyQuotaConf `json:"monthly"`
 }

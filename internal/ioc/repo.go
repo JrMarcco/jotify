@@ -2,11 +2,26 @@ package ioc
 
 import (
 	"github.com/JrMarcco/jotify/internal/repository"
+	"github.com/JrMarcco/jotify/internal/repository/cache"
+	"github.com/JrMarcco/jotify/internal/repository/cache/local"
+	"github.com/JrMarcco/jotify/internal/repository/cache/redis"
 	"github.com/JrMarcco/jotify/internal/repository/dao"
 	"go.uber.org/fx"
 )
 
 var RepoFxOpt = fx.Options(
+	// cache
+	fx.Provide(
+		fx.Annotate(
+			local.NewBizConfLocalCache,
+			fx.As(new(cache.BizConfCache)),
+		),
+		fx.Annotate(
+			redis.NewBizConfRedisCache,
+			fx.As(new(cache.BizConfCache)),
+		),
+	),
+
 	// dao
 	fx.Provide(
 		// biz config dao

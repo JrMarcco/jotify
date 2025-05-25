@@ -15,7 +15,11 @@ var DBFxOpt = fx.Provide(
 	InitBaseDB,
 	InitShardingDB,
 	fx.Annotate(
-		InitNotifShardingSharding,
+		InitNotifShardingStrategy,
+		fx.As(new(sharding.Strategy)),
+	),
+	fx.Annotate(
+		InitCbLogShardingStrategy,
 		fx.As(new(sharding.Strategy)),
 	),
 )
@@ -69,8 +73,14 @@ func InitShardingDB() *xsync.Map[string, *gorm.DB] {
 	return &dbs
 }
 
-func InitNotifShardingSharding() sharding.HashStrategy {
+func InitNotifShardingStrategy() sharding.HashStrategy {
 	return sharding.NewHashStrategy(
 		"jotify", "notification", 2, 4,
+	)
+}
+
+func InitCbLogShardingStrategy() sharding.HashStrategy {
+	return sharding.NewHashStrategy(
+		"jotify", "callback_log", 2, 4,
 	)
 }

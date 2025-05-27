@@ -37,7 +37,7 @@ func (d *DefaultNotifRepo) Create(ctx context.Context, n domain.Notification) (d
 
 	entity, err := d.notifDAO.Create(ctx, d.toEntity(n))
 	if err != nil {
-		// 创建消息失败则退还额度
+		// 创建消息失败则退还配额
 		if err := d.quotaCache.Incr(ctx, n.BizId, n.Channel, defaultQuota); err != nil {
 			d.logger.Error(
 				"[jotify] failed to refund quota",
@@ -52,8 +52,27 @@ func (d *DefaultNotifRepo) Create(ctx context.Context, n domain.Notification) (d
 }
 
 func (d *DefaultNotifRepo) CreateWithCallback(ctx context.Context, n domain.Notification) (domain.Notification, error) {
-	//TODO implement me
-	panic("implement me")
+	// TODO 使用配额锁定记录表来进行配额管理
+	// 扣减配额
+	if err := d.quotaCache.Decr(ctx, n.BizId, n.Channel, defaultQuota); err != nil {
+		return domain.Notification{}, err
+	}
+
+	entity, err := d.notifDAO.CreateWithCallback(ctx, d.toEntity(n))
+	if err != nil {
+		// 创建消息失败则退还配额
+		if err := d.quotaCache.Incr(ctx, n.BizId, n.Channel, defaultQuota); err != nil {
+			d.logger.Error(
+				"[jotify] failed to refund quota",
+				zap.Error(err),
+				zap.Uint64("biz_id", n.BizId),
+				zap.String("channel", string(n.Channel)),
+			)
+		}
+		return domain.Notification{}, err
+	}
+	return d.toDomain(entity), nil
+
 }
 
 func (d *DefaultNotifRepo) toEntity(n domain.Notification) dao.Notification {

@@ -35,6 +35,7 @@ type Notification struct {
 
 type NotificationDAO interface {
 	Create(ctx context.Context, n Notification) (Notification, error)
+	CreateWithCallback(ctx context.Context, entity Notification) (Notification, error)
 }
 
 var _ NotificationDAO = (*NotifShardingDAO)(nil)
@@ -51,6 +52,10 @@ type NotifShardingDAO struct {
 
 func (nd *NotifShardingDAO) Create(ctx context.Context, n Notification) (Notification, error) {
 	return nd.create(ctx, n, false)
+}
+
+func (nd *NotifShardingDAO) CreateWithCallback(ctx context.Context, entity Notification) (Notification, error) {
+	return nd.create(ctx, entity, true)
 }
 
 func (nd *NotifShardingDAO) create(ctx context.Context, n Notification, needCallback bool) (Notification, error) {

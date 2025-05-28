@@ -4,14 +4,17 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
+	"github.com/JrMarcco/easy-kit/slice"
+	"github.com/JrMarcco/easy-kit/xmap"
 	"github.com/JrMarcco/easy-kit/xsync"
 	"github.com/JrMarcco/jotify/internal/domain"
 	"github.com/JrMarcco/jotify/internal/errs"
 	"github.com/JrMarcco/jotify/internal/pkg/sharding"
 	"github.com/JrMarcco/jotify/internal/pkg/snowflake"
-	"github.com/go-sql-driver/mysql"
+	"golang.org/x/sync/errgroup"
 	"gorm.io/gorm"
 )
 
@@ -36,6 +39,8 @@ type Notification struct {
 type NotificationDAO interface {
 	Create(ctx context.Context, n Notification) (Notification, error)
 	CreateWithCallback(ctx context.Context, entity Notification) (Notification, error)
+	BatchCreate(ctx context.Context, ns []Notification) ([]Notification, error)
+	BatchCreateWithCallback(ctx context.Context, ns []Notification) ([]Notification, error)
 }
 
 var _ NotificationDAO = (*NotifShardingDAO)(nil)
@@ -60,7 +65,6 @@ func (nd *NotifShardingDAO) CreateWithCallback(ctx context.Context, entity Notif
 
 func (nd *NotifShardingDAO) create(ctx context.Context, n Notification, needCallback bool) (Notification, error) {
 	now := time.Now().UnixMilli()
-
 	n.CreatedAt, n.UpdatedAt, n.Version = now, now, 1
 
 	// 分库分表规则
@@ -78,25 +82,20 @@ func (nd *NotifShardingDAO) create(ctx context.Context, n Notification, needCall
 			n.Id = nd.idGenerator.NextId(n.BizId, n.BizKey)
 			if err := tx.Table(notifDst.Table).Create(&n).Error; err != nil {
 				// 创建 notification 记录失败
-				if nd.isUniqueConstraintErr(err) {
-					// 唯一索引冲突
-					if IsIdDuplicateErr(n.Id, err) {
-						// 主键冲突，重新生成 id 再执行插入
-						continue
-					}
-					// 非主键冲突直接返回
-					return nil
+				if errors.Is(err, gorm.ErrDuplicatedKey) && IsIdDuplicateErr([]uint64{n.Id}, err) {
+					// 主键冲突，重新生成 id 再执行插入
+					continue
 				}
 				return err
 			}
 
 			if needCallback {
 				cb := &CallbackLog{
-					Id:          n.Id,
-					Status:      domain.CallbackStatusInit.String(),
-					NextRetryAt: now,
-					CreatedAt:   now,
-					UpdatedAt:   now,
+					NotificationId: n.Id,
+					Status:         domain.CallbackStatusInit.String(),
+					NextRetryAt:    now,
+					CreatedAt:      now,
+					UpdatedAt:      now,
 				}
 				if err := tx.Table(cbLogDst.Table).Create(&cb).Error; err != nil {
 					return fmt.Errorf("%w", errs.ErrFailedToCreateCallbackLog)
@@ -108,17 +107,120 @@ func (nd *NotifShardingDAO) create(ctx context.Context, n Notification, needCall
 	return n, err
 }
 
-func (nd *NotifShardingDAO) isUniqueConstraintErr(err error) bool {
-	if err == nil {
-		return false
+func (nd *NotifShardingDAO) BatchCreate(ctx context.Context, ns []Notification) ([]Notification, error) {
+	return nd.batchCreate(ctx, ns, false)
+}
+
+func (nd *NotifShardingDAO) BatchCreateWithCallback(ctx context.Context, ns []Notification) ([]Notification, error) {
+	return nd.batchCreate(ctx, ns, true)
+}
+
+func (nd *NotifShardingDAO) batchCreate(ctx context.Context, ns []Notification, needCallback bool) ([]Notification, error) {
+	if len(ns) == 0 {
+		return []Notification{}, nil
 	}
 
-	mysqlErr := new(mysql.MySQLError)
-	if ok := errors.As(err, &mysqlErr); ok {
-		const uniqueConstraintErrCode = 1062
-		return mysqlErr.Number == uniqueConstraintErrCode
+	now := time.Now().UnixMilli()
+	pointers := slice.Map(ns, func(_ int, src Notification) *Notification {
+		src.CreatedAt, src.UpdatedAt, src.Version = now, now, 1
+		return &src
+	})
+
+	return nd.tryBatchInsert(ctx, pointers, needCallback)
+}
+
+func (nd *NotifShardingDAO) tryBatchInsert(ctx context.Context, ns []*Notification, needCallback bool) ([]Notification, error) {
+	// 按照分库规则对 notification 进行分组
+	const maxDBNum = 32
+	m := make(map[string][]*Notification, maxDBNum)
+
+	for _, n := range ns {
+		dst := nd.notifShardingStrategy.Shard(n.BizId, n.BizKey)
+		mapNs, ok := m[dst.DB]
+		if !ok {
+			mapNs = make([]*Notification, 0, 16)
+		}
+		mapNs = append(mapNs, n)
+		m[dst.DB] = mapNs
 	}
-	return false
+
+	var eg errgroup.Group
+	dbNames := xmap.Keys(m)
+	for _, dbName := range dbNames {
+		// 这里不会出现不存在的情况，可以忽略第二个参数
+		dbNs, _ := m[dbName]
+		db, ok := nd.dbs.Load(dbName)
+		if !ok {
+			return []Notification{}, fmt.Errorf("fail to load db: %s", dbName)
+		}
+
+		eg.Go(func() error {
+			for {
+				sql, args, ids := nd.sqlGenerate(db, dbNs, needCallback)
+				if sql != "" {
+					if err := db.WithContext(ctx).Exec(sql, args...).Error; err != nil {
+						if errors.Is(err, gorm.ErrDuplicatedKey) && IsIdDuplicateErr(ids, err) {
+							// 主键冲突，重新生成 id 再执行插入
+							continue
+						}
+						return err
+					}
+				}
+				return nil
+			}
+		})
+	}
+
+	err := eg.Wait()
+	return slice.Map(ns, func(_ int, src *Notification) Notification {
+		if src == nil {
+			return Notification{}
+		}
+		return *src
+	}), err
+}
+
+func (nd *NotifShardingDAO) sqlGenerate(db *gorm.DB, ns []*Notification, needCallback bool) (string, []any, []uint64) {
+	now := time.Now().UnixMilli()
+
+	// 临时开启 gorm dry run 来生成 sql
+	gormSession := db.Session(&gorm.Session{DryRun: true})
+	ids := make([]uint64, 0, len(ns))
+	// 包含 callback log
+	sqls := make([]string, 0, 2*len(ns))
+	// Notification 14 个字段
+	// CallbackLog  6  个字段
+	args := make([]any, 0, 20*len(ns))
+
+	for _, n := range ns {
+		id := nd.idGenerator.NextId(n.BizId, n.BizKey)
+		n.Id = id
+		ids = append(ids, id)
+
+		dst := nd.notifShardingStrategy.Shard(n.BizId, n.BizKey)
+		statement := gormSession.Table(dst.Table).Create(&n).Statement
+		sqls = append(sqls, statement.SQL.String())
+		args = append(args, statement.Vars...)
+
+		if needCallback {
+			dst = nd.cbLogShardingStrategy.Shard(n.BizId, n.BizKey)
+			statement = gormSession.Table(dst.Table).Create(&CallbackLog{
+				NotificationId: id,
+				Status:         domain.CallbackStatusInit.String(),
+				NextRetryAt:    now,
+				CreatedAt:      now,
+				UpdatedAt:      now,
+			}).Statement
+			sqls = append(sqls, statement.SQL.String())
+			args = append(args, statement.Vars...)
+		}
+	}
+
+	if len(sqls) == 0 {
+		return "", []any{}, []uint64{}
+	}
+
+	return strings.Join(sqls, ";"), args, ids
 }
 
 func NewNotifShardingDAO(

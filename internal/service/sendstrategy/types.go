@@ -8,6 +8,12 @@ import (
 	"github.com/JrMarcco/jotify/internal/errs"
 )
 
+// SendStrategy 消息发送策略。
+//
+// 目前两种实现：
+// DefaultSendStrategy 		默认，使用异步发送（存库等待后续调度执行实际发送）
+// ImmediateSendStrategy	立即发送，即同步
+//
 //go:generate mockegn -source=./types.go -destination=./mock/send_strategy.mock.go -package=sendstrategymock -type=SendStrategy
 type SendStrategy interface {
 	Send(ctx context.Context, n domain.Notification) (domain.SendResp, error)

@@ -22,6 +22,11 @@ var RepoFxOpt = fx.Options(
 			fx.As(new(cache.BizConfCache)),
 			fx.ResultTags(`name:"biz_conf_redis_cache"`),
 		),
+		fx.Annotate(
+			redis.NewQuotaRedisCache,
+			fx.As(new(cache.QuotaCache)),
+			fx.ResultTags(`name:"quota_redis_cache"`),
+		),
 	),
 
 	// dao

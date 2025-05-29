@@ -11,7 +11,8 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-//go:generate mockGen -source=./notification_send.go -destination=./mock/send_service.mock.go -package=notificationmock -type=SendService
+//go:generate mockgen -source=./notification_send.go -destination=./mock/send_service.mock.go -package=notificationmock -typed SendService
+
 type SendService interface {
 	Send(ctx context.Context, n domain.Notification) (domain.SendResp, error)
 	AsyncSend(ctx context.Context, n domain.Notification) (domain.SendResp, error)

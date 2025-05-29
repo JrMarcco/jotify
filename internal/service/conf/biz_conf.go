@@ -2,7 +2,8 @@ package conf
 
 import "github.com/JrMarcco/jotify/internal/repository"
 
-//go:generate mockgen -source=./biz_conf.go -destination=./mock/biz_conf.mock.go -pack=confmock -type=BizConfService
+//go:generate mockgen -source=./biz_conf.go -destination=./mock/biz_conf.mock.go -package=confmock -typed BizConfService
+
 type BizConfService interface {
 }
 

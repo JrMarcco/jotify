@@ -79,17 +79,17 @@ func (b BizType) Validate() bool {
 
 // ChannelTpl 渠道模板领域对象
 type ChannelTpl struct {
-	Id              uint64
-	OwnerId         uint64
-	OwnerType       OwnerType
-	Name            string
-	Description     string
-	Channel         Channel
-	BizType         BizType
-	ActiveVersionId uint64
-	CreateAt        int64
-	UpdateAt        int64
-	Versions        []ChannelTplVersion
+	Id                 uint64
+	OwnerId            uint64
+	OwnerType          OwnerType
+	Name               string
+	Description        string
+	Channel            Channel
+	BizType            BizType
+	ActivatedVersionId uint64
+	CreateAt           int64
+	UpdateAt           int64
+	Versions           []ChannelTplVersion
 }
 
 func (ct ChannelTpl) Validate() error {
@@ -121,16 +121,16 @@ func (ct ChannelTpl) Validate() error {
 }
 
 func (ct ChannelTpl) Published() bool {
-	return ct.ActiveVersionId > 0
+	return ct.ActivatedVersionId > 0
 }
 
-func (ct ChannelTpl) ActiveVersion() *ChannelTplVersion {
-	if ct.ActiveVersionId <= 0 {
+func (ct ChannelTpl) ActivatedVersion() *ChannelTplVersion {
+	if ct.ActivatedVersionId <= 0 {
 		return nil
 	}
 
 	for _, v := range ct.Versions {
-		if v.Id == ct.ActiveVersionId {
+		if v.Id == ct.ActivatedVersionId {
 			return &v
 		}
 	}
@@ -205,8 +205,8 @@ type ChannelTplProvider struct {
 	ProviderId      uint64
 	ProviderName    string
 	ProviderChannel Channel
-	ReqId           string
-	ProviderTplId   uint64
+	RequestId       string
+	ProviderTplId   string
 	AuditStatus     AuditStatus
 	RejectReason    string
 	LastReviewAt    int64

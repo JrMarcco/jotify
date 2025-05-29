@@ -42,6 +42,16 @@ var RepoFxOpt = fx.Options(
 			fx.As(new(dao.NotificationDAO)),
 			fx.ParamTags(`name:"notification_sharding_strategy"`, `name:"callback_log_sharding_strategy"`),
 		),
+		// channel template dao
+		fx.Annotate(
+			dao.NewDefaultChannelTplDAO,
+			fx.As(new(dao.ChannelTplDAO)),
+		),
+		// provider dao
+		fx.Annotate(
+			dao.NewDefaultProviderDAO,
+			fx.As(new(dao.ProviderDAO)),
+		),
 	),
 
 	// repository
@@ -55,6 +65,16 @@ var RepoFxOpt = fx.Options(
 		fx.Annotate(
 			repository.NewDefaultNotifRepo,
 			fx.As(new(repository.NotificationRepo)),
+		),
+		// channel template repository
+		fx.Annotate(
+			repository.NewDefaultChannelTplRepo,
+			fx.As(new(repository.ChannelTplRepo)),
+		),
+		// provider repository
+		fx.Annotate(
+			repository.NewDefaultProviderRepo,
+			fx.As(new(repository.ProviderRepo)),
 		),
 	),
 )

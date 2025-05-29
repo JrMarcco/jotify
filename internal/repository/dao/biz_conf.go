@@ -37,8 +37,7 @@ type DefaultBizConfDAO struct {
 
 func (d *DefaultBizConfDAO) GetById(ctx context.Context, id uint64) (BizConf, error) {
 	var bizConf BizConf
-
-	err := d.db.WithContext(ctx).Where("id = ?", id).First(&bizConf).Error
+	err := d.db.WithContext(ctx).Model(&BizConf{}).Where("id = ?", id).First(&bizConf).Error
 	if err != nil {
 		return BizConf{}, err
 	}

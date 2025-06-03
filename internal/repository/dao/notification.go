@@ -47,7 +47,7 @@ type NotificationDAO interface {
 	GetMapByIds(ctx context.Context, ids []uint64) (map[uint64]Notification, error)
 
 	MarkSuccess(ctx context.Context, entity Notification) error
-	MarkFailed(ctx context.Context, entity Notification) error
+	MarkFailure(ctx context.Context, entity Notification) error
 }
 
 var _ NotificationDAO = (*NotifShardingDAO)(nil)
@@ -324,7 +324,7 @@ func (nd *NotifShardingDAO) MarkSuccess(ctx context.Context, entity Notification
 	})
 }
 
-func (nd *NotifShardingDAO) MarkFailed(ctx context.Context, entity Notification) error {
+func (nd *NotifShardingDAO) MarkFailure(ctx context.Context, entity Notification) error {
 	now := time.Now().UnixMilli()
 	dst := nd.notifShardingStrategy.ShardWithId(entity.Id)
 	db, ok := nd.dbs.Load(dst.DB)

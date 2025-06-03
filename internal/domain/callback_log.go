@@ -6,8 +6,8 @@ type CallbackLogStatus string
 const (
 	CallbackStatusInit    CallbackLogStatus = "init"
 	CallbackStatusPending CallbackLogStatus = "pending"
-	CallbackStatusSucceed CallbackLogStatus = "succeed"
-	CallbackStatusFailed  CallbackLogStatus = "failed"
+	CallbackStatusSuccess CallbackLogStatus = "success"
+	CallbackStatusFailure CallbackLogStatus = "failure"
 )
 
 func (s CallbackLogStatus) String() string {

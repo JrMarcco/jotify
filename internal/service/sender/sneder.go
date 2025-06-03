@@ -38,11 +38,11 @@ func (ds *DefaultSender) Send(ctx context.Context, n domain.Notification) (domai
 	_, err := ds.channel.Send(ctx, n)
 	if err != nil {
 		ds.logger.Error("[jotify] send notification error", zap.Error(err))
-		res.Status = domain.SendStatusFailed
-		n.Status = domain.SendStatusFailed
+		res.Status = domain.SendStatusFailure
+		n.Status = domain.SendStatusFailure
 
 		// 发送失败，把 quota 加回去
-		err = ds.notifRepo.MarkFailed(ctx, n)
+		err = ds.notifRepo.MarkFailure(ctx, n)
 	} else {
 		res.Status = domain.SendStatusSuccess
 		n.Status = domain.SendStatusSuccess
@@ -54,7 +54,8 @@ func (ds *DefaultSender) Send(ctx context.Context, n domain.Notification) (domai
 	}
 
 	// TODO
-	// 处理回调
+	// 处理回调通知发送结果
+
 	return domain.SendResp{Result: res}, nil
 }
 

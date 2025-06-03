@@ -46,6 +46,11 @@ var ServiceFxOpt = fx.Options(
 			fx.As(new(notification.SendService)),
 			fx.ParamTags(`name:"send_strategy_dispatcher"`),
 		),
+		// callback service
+		fx.Annotate(
+			notification.NewDefaultCallbackService,
+			fx.As(new(notification.CallbackService)),
+		),
 		// provider
 		InitTencentSmsClient,
 		fx.Annotate(

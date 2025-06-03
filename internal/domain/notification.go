@@ -13,12 +13,12 @@ import (
 type SendStatus string
 
 const (
-	SendStatusPrepare  SendStatus = "prepare"
-	SendStatusCanceled SendStatus = "canceled"
-	SendStatusPending  SendStatus = "pending"
-	SendStatusSending  SendStatus = "sending"
-	SendStatusSuccess  SendStatus = "success"
-	SendStatusFailed   SendStatus = "failed"
+	SendStatusPrepare SendStatus = "prepare"
+	SendStatusCancel  SendStatus = "cancel"
+	SendStatusPending SendStatus = "pending"
+	SendStatusSending SendStatus = "sending"
+	SendStatusSuccess SendStatus = "success"
+	SendStatusFailure SendStatus = "failure"
 )
 
 func (s SendStatus) String() string {
@@ -133,7 +133,7 @@ func NotificationFromApi(n *notificationv1.Notification) (Notification, error) {
 		return Notification{}, fmt.Errorf("%w: notification is nil", errs.ErrInvalidParam)
 	}
 
-	tplId, err := strconv.ParseUint(n.TempId, 10, 64)
+	tplId, err := strconv.ParseUint(n.TplId, 10, 64)
 	if err != nil {
 		return Notification{}, fmt.Errorf("%w: parse template id failed: %w", errs.ErrInvalidParam, err)
 	}
@@ -149,12 +149,12 @@ func NotificationFromApi(n *notificationv1.Notification) (Notification, error) {
 	}
 
 	return Notification{
-		BizKey:    n.Key,
+		BizKey:    n.BizKey,
 		Receivers: n.Receivers,
 		Channel:   channel,
 		Template: Template{
 			Id:     tplId,
-			Params: n.TempParams,
+			Params: n.TplParams,
 		},
 		StrategyConfig: strategyConfig,
 	}, nil

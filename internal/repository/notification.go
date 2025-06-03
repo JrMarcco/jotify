@@ -21,7 +21,7 @@ type NotificationRepo interface {
 	BatchCreate(ctx context.Context, ns []domain.Notification) ([]domain.Notification, error)
 	BatchCreateWithCallback(ctx context.Context, ns []domain.Notification) ([]domain.Notification, error)
 	MarkSuccess(ctx context.Context, n domain.Notification) error
-	MarkFailed(ctx context.Context, n domain.Notification) error
+	MarkFailure(ctx context.Context, n domain.Notification) error
 }
 
 const (
@@ -142,8 +142,8 @@ func (d *DefaultNotifRepo) MarkSuccess(ctx context.Context, n domain.Notificatio
 	return d.notifDAO.MarkSuccess(ctx, d.toEntity(n))
 }
 
-func (d *DefaultNotifRepo) MarkFailed(ctx context.Context, n domain.Notification) error {
-	err := d.notifDAO.MarkFailed(ctx, d.toEntity(n))
+func (d *DefaultNotifRepo) MarkFailure(ctx context.Context, n domain.Notification) error {
+	err := d.notifDAO.MarkFailure(ctx, d.toEntity(n))
 	if err != nil {
 		return err
 	}

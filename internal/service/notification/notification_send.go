@@ -30,7 +30,7 @@ type DefaultSendService struct {
 func (d *DefaultSendService) Send(ctx context.Context, n domain.Notification) (domain.SendResp, error) {
 	resp := domain.SendResp{
 		Result: domain.SendResult{
-			Status: domain.SendStatusFailed,
+			Status: domain.SendStatusFailure,
 		},
 	}
 

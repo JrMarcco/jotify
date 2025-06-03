@@ -12,8 +12,9 @@ import (
 
 type CallbackLogRepo interface {
 	Find(ctx context.Context, startTime int64, startId uint64, batchSize int) ([]domain.CallbackLog, uint64, error)
-	Update(ctx context.Context, logs []domain.CallbackLog) error
 	FindByNotificationIds(ctx context.Context, notificationIds []uint64) ([]domain.CallbackLog, error)
+
+	Update(ctx context.Context, logs []domain.CallbackLog) error
 }
 
 var _ CallbackLogRepo = (*DefaultCallbackLogRepo)(nil)
@@ -39,12 +40,6 @@ func (d *DefaultCallbackLogRepo) Find(ctx context.Context, startTime int64, star
 	}), nextStartId, nil
 }
 
-func (d *DefaultCallbackLogRepo) Update(ctx context.Context, logs []domain.CallbackLog) error {
-	return d.callbackLogDAO.Update(ctx, slice.Map(logs, func(_ int, src domain.CallbackLog) dao.CallbackLog {
-		return d.toEntity(src)
-	}))
-}
-
 func (d *DefaultCallbackLogRepo) FindByNotificationIds(ctx context.Context, notificationIds []uint64) ([]domain.CallbackLog, error) {
 	logs, err := d.callbackLogDAO.FindByNotificationIds(ctx, notificationIds)
 	if err != nil {
@@ -59,6 +54,12 @@ func (d *DefaultCallbackLogRepo) FindByNotificationIds(ctx context.Context, noti
 	return slice.Map(logs, func(_ int, src dao.CallbackLog) domain.CallbackLog {
 		return d.toDomain(src, ns[src.NotificationId])
 	}), nil
+}
+
+func (d *DefaultCallbackLogRepo) Update(ctx context.Context, logs []domain.CallbackLog) error {
+	return d.callbackLogDAO.Update(ctx, slice.Map(logs, func(_ int, src domain.CallbackLog) dao.CallbackLog {
+		return d.toEntity(src)
+	}))
 }
 
 func (d *DefaultCallbackLogRepo) toDomain(cl dao.CallbackLog, notification dao.Notification) domain.CallbackLog {

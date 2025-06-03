@@ -4,7 +4,7 @@ go 1.24
 
 require (
 	github.com/JrMarcco/easy-kit v0.0.5
-	github.com/JrMarcco/jotify-api v0.0.1
+	github.com/JrMarcco/jotify-api v0.0.5
 	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/patrickmn/go-cache v2.1.0+incompatible

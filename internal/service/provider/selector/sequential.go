@@ -32,10 +32,10 @@ type SeqSelectorBuilder struct {
 	providers []provider.Provider
 }
 
-func (ssb *SeqSelectorBuilder) Build() provider.SelectorBuilder {
-	return &SeqSelectorBuilder{
+func (ssb *SeqSelectorBuilder) Build() (provider.Selector, error) {
+	return &SeqSelector{
 		providers: ssb.providers,
-	}
+	}, nil
 }
 
 func NewSeqSelectorBuilder(providers []provider.Provider) *SeqSelectorBuilder {

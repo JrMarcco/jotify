@@ -20,6 +20,8 @@ type NotificationRepo interface {
 	CreateWithCallback(ctx context.Context, n domain.Notification) (domain.Notification, error)
 	BatchCreate(ctx context.Context, ns []domain.Notification) ([]domain.Notification, error)
 	BatchCreateWithCallback(ctx context.Context, ns []domain.Notification) ([]domain.Notification, error)
+	MarkSuccess(ctx context.Context, n domain.Notification) error
+	MarkFailed(ctx context.Context, n domain.Notification) error
 }
 
 const (
@@ -88,7 +90,6 @@ func (d *DefaultNotifRepo) CreateWithCallback(ctx context.Context, n domain.Noti
 		return domain.Notification{}, err
 	}
 	return d.toDomain(entity), nil
-
 }
 
 func (d *DefaultNotifRepo) BatchCreate(ctx context.Context, ns []domain.Notification) ([]domain.Notification, error) {
@@ -135,6 +136,22 @@ func (d *DefaultNotifRepo) BatchCreateWithCallback(ctx context.Context, ns []dom
 	return slice.Map(entities, func(_ int, entity dao.Notification) domain.Notification {
 		return d.toDomain(entity)
 	}), nil
+}
+
+func (d *DefaultNotifRepo) MarkSuccess(ctx context.Context, n domain.Notification) error {
+	return d.notifDAO.MarkSuccess(ctx, d.toEntity(n))
+}
+
+func (d *DefaultNotifRepo) MarkFailed(ctx context.Context, n domain.Notification) error {
+	err := d.notifDAO.MarkFailed(ctx, d.toEntity(n))
+	if err != nil {
+		return err
+	}
+	return d.quotaCache.Incr(ctx, cache.QuotaParam{
+		BizId:   n.BizId,
+		Channel: n.Channel,
+		Quota:   defaultQuota,
+	})
 }
 
 func (d *DefaultNotifRepo) buildQuotaParams(ns []domain.Notification) []cache.QuotaParam {

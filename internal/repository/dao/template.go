@@ -108,7 +108,7 @@ func (d *DefaultChannelTplDAO) GetVersionsByIds(ctx context.Context, versionIds 
 	}
 
 	var versions []ChannelTplVersion
-	res := d.db.WithContext(ctx).Where("channel_tpl_id IN ?", versionIds).Find(&versions)
+	res := d.db.WithContext(ctx).Where("channel_tpl_id IN (?)", versionIds).Find(&versions)
 	if res.Error != nil {
 		return nil, res.Error
 	}

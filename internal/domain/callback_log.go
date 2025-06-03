@@ -1,24 +1,23 @@
 package domain
 
-// CallbackStatus 回调状态
-type CallbackStatus string
+// CallbackLogStatus 回调状态
+type CallbackLogStatus string
 
 const (
-	CallbackStatusInit    CallbackStatus = "init"
-	CallbackStatusPending CallbackStatus = "pending"
-	CallbackStatusSucceed CallbackStatus = "succeed"
-	CallbackStatusFailed  CallbackStatus = "failed"
+	CallbackStatusInit    CallbackLogStatus = "init"
+	CallbackStatusPending CallbackLogStatus = "pending"
+	CallbackStatusSucceed CallbackLogStatus = "succeed"
+	CallbackStatusFailed  CallbackLogStatus = "failed"
 )
 
-func (s CallbackStatus) String() string {
+func (s CallbackLogStatus) String() string {
 	return string(s)
 }
 
 // CallbackLog 回调日志领域对象
 type CallbackLog struct {
-	Id           uint64
 	Notification Notification
 	RetriedTimes int32
 	NextRetryAt  int64
-	Status       CallbackStatus
+	Status       CallbackLogStatus
 }

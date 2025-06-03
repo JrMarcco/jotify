@@ -52,6 +52,11 @@ var RepoFxOpt = fx.Options(
 			dao.NewDefaultProviderDAO,
 			fx.As(new(dao.ProviderDAO)),
 		),
+		// callback log dao
+		fx.Annotate(
+			dao.NewDefaultCallbackLogDAO,
+			fx.As(new(dao.CallbackLogDAO)),
+		),
 	),
 
 	// repository
@@ -75,6 +80,11 @@ var RepoFxOpt = fx.Options(
 		fx.Annotate(
 			repository.NewDefaultProviderRepo,
 			fx.As(new(repository.ProviderRepo)),
+		),
+		// callback log repository
+		fx.Annotate(
+			repository.NewDefaultCallbackLogRepo,
+			fx.As(new(repository.CallbackLogRepo)),
 		),
 	),
 )

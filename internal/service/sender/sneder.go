@@ -33,8 +33,29 @@ type DefaultSender struct {
 }
 
 func (ds *DefaultSender) Send(ctx context.Context, n domain.Notification) (domain.SendResp, error) {
-	//TODO implement me
-	panic("implement me")
+	res := domain.SendResult{NotificationId: n.Id}
+
+	_, err := ds.channel.Send(ctx, n)
+	if err != nil {
+		ds.logger.Error("[jotify] send notification error", zap.Error(err))
+		res.Status = domain.SendStatusFailed
+		n.Status = domain.SendStatusFailed
+
+		// 发送失败，把 quota 加回去
+		err = ds.notifRepo.MarkFailed(ctx, n)
+	} else {
+		res.Status = domain.SendStatusSuccess
+		n.Status = domain.SendStatusSuccess
+		err = ds.notifRepo.MarkSuccess(ctx, n)
+	}
+
+	if err != nil {
+		return domain.SendResp{}, err
+	}
+
+	// TODO
+	// 处理回调
+	return domain.SendResp{Result: res}, nil
 }
 
 func (ds *DefaultSender) BatchSend(ctx context.Context, ns []domain.Notification) (domain.BatchSendResp, error) {

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/JrMarcco/easy-kit/slice"
@@ -41,6 +42,12 @@ type NotificationDAO interface {
 	CreateWithCallback(ctx context.Context, entity Notification) (Notification, error)
 	BatchCreate(ctx context.Context, ns []Notification) ([]Notification, error)
 	BatchCreateWithCallback(ctx context.Context, ns []Notification) ([]Notification, error)
+
+	GetById(ctx context.Context, id uint64) (Notification, error)
+	GetMapByIds(ctx context.Context, ids []uint64) (map[uint64]Notification, error)
+
+	MarkSuccess(ctx context.Context, entity Notification) error
+	MarkFailed(ctx context.Context, entity Notification) error
 }
 
 var _ NotificationDAO = (*NotifShardingDAO)(nil)
@@ -221,6 +228,118 @@ func (nd *NotifShardingDAO) sqlGenerate(db *gorm.DB, ns []*Notification, needCal
 	}
 
 	return strings.Join(sqls, ";"), args, ids
+}
+
+func (nd *NotifShardingDAO) GetById(ctx context.Context, id uint64) (Notification, error) {
+	dst := nd.notifShardingStrategy.ShardWithId(id)
+	db, ok := nd.dbs.Load(dst.DB)
+	if !ok {
+		return Notification{}, fmt.Errorf("fail to load db: %s", dst.DB)
+	}
+
+	var n Notification
+	err := db.WithContext(ctx).Table(dst.Table).Where("id = ?", id).First(&n).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return Notification{}, fmt.Errorf("%w: id = %d", errs.ErrNotificationNotFound, id)
+		}
+		return Notification{}, err
+	}
+	return n, nil
+}
+
+func (nd *NotifShardingDAO) GetMapByIds(ctx context.Context, ids []uint64) (map[uint64]Notification, error) {
+	idMap := make(map[[2]string][]uint64, len(ids))
+	for _, id := range ids {
+		dst := nd.notifShardingStrategy.ShardWithId(id)
+
+		key := [2]string{dst.DB, dst.Table}
+		val, ok := idMap[key]
+		if ok {
+			val = append(val, id)
+		} else {
+			val = []uint64{id}
+		}
+
+		idMap[key] = val
+	}
+
+	notifMap := make(map[uint64]Notification, len(idMap))
+	mu := new(sync.RWMutex)
+
+	// 广播查找
+	var eg errgroup.Group
+	for key, val := range idMap {
+		mapKey := key
+		mapVal := val
+		eg.Go(func() error {
+			var ns []Notification
+
+			dbName := mapKey[0]
+			db, ok := nd.dbs.Load(dbName)
+			if !ok {
+				return fmt.Errorf("fail to load db: %s", dbName)
+			}
+			tableName := mapKey[1]
+			err := db.WithContext(ctx).Table(tableName).Where("id in (?)", mapVal).Find(&ns).Error
+			for i := range ns {
+				n := ns[i]
+				mu.Lock()
+				notifMap[n.Id] = n
+				mu.Unlock()
+			}
+			return err
+		})
+	}
+	return notifMap, eg.Wait()
+}
+
+func (nd *NotifShardingDAO) MarkSuccess(ctx context.Context, entity Notification) error {
+	now := time.Now().UnixMilli()
+	dst := nd.notifShardingStrategy.ShardWithId(entity.Id)
+	cbLogDst := nd.cbLogShardingStrategy.ShardWithId(entity.Id)
+
+	db, ok := nd.dbs.Load(dst.DB)
+	if !ok {
+		return fmt.Errorf("fail to load db: %s", dst.DB)
+	}
+
+	return db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		err := tx.Table(dst.Table).Model(&Notification{}).Where("id = ?", entity.Id).
+			Updates(map[string]any{
+				"status":    entity.Status,
+				"update_at": now,
+				"version":   gorm.Expr("version + 1"),
+			}).Error
+		if err != nil {
+			return err
+		}
+
+		// 标记 callback log 状态为 pending（可发送）
+		return tx.Table(cbLogDst.Table).Model(&CallbackLog{}).Where("notification_id = ?", entity.Id).
+			Updates(map[string]any{
+				"status":    domain.CallbackStatusPending,
+				"update_at": now,
+			}).Error
+	})
+}
+
+func (nd *NotifShardingDAO) MarkFailed(ctx context.Context, entity Notification) error {
+	now := time.Now().UnixMilli()
+	dst := nd.notifShardingStrategy.ShardWithId(entity.Id)
+	db, ok := nd.dbs.Load(dst.DB)
+	if !ok {
+		return fmt.Errorf("fail to load db: %s", dst.DB)
+	}
+
+	return db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		return tx.Table(dst.Table).Model(&Notification{}).Where("id = ?", entity.Id).
+			Updates(map[string]any{
+				"status":    entity.Status,
+				"update_at": now,
+				"version":   gorm.Expr("version + 1"),
+			}).Error
+	})
 }
 
 func NewNotifShardingDAO(

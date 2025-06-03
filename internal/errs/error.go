@@ -11,6 +11,7 @@ var (
 	ErrChannelTplNotFound        = errors.New("[jotify] channel template not found")
 	ErrChannelTplVersionNotFound = errors.New("[jotify] channel template version not found")
 	ErrNotApprovedTplVersion     = errors.New("[jotify] channel template version is not approved")
+	ErrNotificationNotFound      = errors.New("[jotify] notification not found")
 	ErrFailedSendNotification    = errors.New("[jotify] failed to send notification")
 	ErrInvalidChannel            = errors.New("[jotify] invalid channel")
 	ErrInvalidSendStrategy       = errors.New("[jotify] invalid send strategy")

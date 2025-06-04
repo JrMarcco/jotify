@@ -126,13 +126,44 @@ func (d *DefaultCallbackService) sendAndSetChangeFields(ctx context.Context, log
 }
 
 func (d *DefaultCallbackService) SendByNotification(ctx context.Context, n domain.Notification) error {
-	//TODO implement me
-	panic("implement me")
+	logs, err := d.callbackLogRepo.FindByNotificationIds(ctx, []uint64{n.Id})
+	if err != nil {
+		return err
+	}
+	return d.sendAndUpdateLogs(ctx, logs)
 }
 
 func (d *DefaultCallbackService) SendByNotifications(ctx context.Context, ns []domain.Notification) error {
-	//TODO implement me
-	panic("implement me")
+	nIds := make([]uint64, 0, len(ns))
+	m := make(map[uint64]domain.Notification, len(ns))
+
+	for i := range ns {
+		nIds = append(nIds, ns[i].Id)
+		m[ns[i].Id] = ns[i]
+	}
+
+	logs, err := d.callbackLogRepo.FindByNotificationIds(ctx, nIds)
+	if err != nil {
+		return err
+	}
+
+	if len(logs) == len(ns) {
+		// 当前所有的通知都已经存在对应的回调日志
+		return d.sendAndUpdateLogs(ctx, logs)
+	}
+	for i := range ns {
+		delete(m, ns[i].Id)
+	}
+
+	if len(logs) != 0 {
+		// 部分消息存在回调日志
+		err = d.callbackLogRepo.Update(ctx, logs)
+	}
+
+	for _, val := range m {
+		_, err = d.sendCallback(ctx, val)
+	}
+	return err
 }
 
 func (d *DefaultCallbackService) sendCallback(ctx context.Context, n domain.Notification) (*clientv1.SendResultNotifyResponse, error) {

@@ -10,6 +10,7 @@ import (
 	"github.com/JrMarcco/jotify/internal/service/provider/selector"
 	"github.com/JrMarcco/jotify/internal/service/provider/sms"
 	"github.com/JrMarcco/jotify/internal/service/provider/sms/client"
+	"github.com/JrMarcco/jotify/internal/service/sender"
 	"github.com/JrMarcco/jotify/internal/service/sendstrategy"
 	"github.com/spf13/viper"
 	"go.uber.org/fx"
@@ -71,10 +72,10 @@ var ServiceFxOpt = fx.Options(
 		channel.NewDispatcher,
 
 		// notification sender
-		//fx.Annotate(
-		//	sender.NewDefaultSender,
-		//	fx.As(new(sender.Sender)),
-		//),
+		fx.Annotate(
+			sender.NewDefaultSender,
+			fx.As(new(sender.Sender)),
+		),
 	),
 )
 

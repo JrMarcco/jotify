@@ -20,8 +20,11 @@ type NotificationRepo interface {
 	CreateWithCallback(ctx context.Context, n domain.Notification) (domain.Notification, error)
 	BatchCreate(ctx context.Context, ns []domain.Notification) ([]domain.Notification, error)
 	BatchCreateWithCallback(ctx context.Context, ns []domain.Notification) ([]domain.Notification, error)
+	BatchUpdateStatus(ctx context.Context, successNs, failure []domain.Notification) error
 	MarkSuccess(ctx context.Context, n domain.Notification) error
 	MarkFailure(ctx context.Context, n domain.Notification) error
+
+	GetMapByIds(ctx context.Context, ids []uint64) (map[uint64]domain.Notification, error)
 }
 
 const (
@@ -138,6 +141,28 @@ func (d *DefaultNotifRepo) BatchCreateWithCallback(ctx context.Context, ns []dom
 	}), nil
 }
 
+func (d *DefaultNotifRepo) buildQuotaParams(ns []domain.Notification) []cache.QuotaParam {
+	m := make(map[string]cache.QuotaParam)
+	for _, n := range ns {
+		key := fmt.Sprintf("%s:%s", n.BizId, n.Channel.String())
+		param, ok := m[key]
+		if !ok {
+			param = cache.QuotaParam{
+				BizId:   n.BizId,
+				Channel: n.Channel,
+			}
+		}
+		param.Quota++
+		m[key] = param
+	}
+	return xmap.Vals(m)
+}
+
+func (d *DefaultNotifRepo) BatchUpdateStatus(ctx context.Context, successNs, failure []domain.Notification) error {
+	//TODO implement me
+	panic("implement me")
+}
+
 func (d *DefaultNotifRepo) MarkSuccess(ctx context.Context, n domain.Notification) error {
 	return d.notifDAO.MarkSuccess(ctx, d.toEntity(n))
 }
@@ -154,21 +179,18 @@ func (d *DefaultNotifRepo) MarkFailure(ctx context.Context, n domain.Notificatio
 	})
 }
 
-func (d *DefaultNotifRepo) buildQuotaParams(ns []domain.Notification) []cache.QuotaParam {
-	m := make(map[string]cache.QuotaParam)
-	for _, n := range ns {
-		key := fmt.Sprintf("%s:%s", n.BizId, n.Channel.String())
-		param, ok := m[key]
-		if !ok {
-			param = cache.QuotaParam{
-				BizId:   n.BizId,
-				Channel: n.Channel,
-			}
-		}
-		param.Quota++
-		m[key] = param
+func (d *DefaultNotifRepo) GetMapByIds(ctx context.Context, ids []uint64) (map[uint64]domain.Notification, error) {
+	entityMap, err := d.notifDAO.GetMapByIds(ctx, ids)
+	if err != nil {
+		return nil, err
 	}
-	return xmap.Vals(m)
+
+	domainMap := make(map[uint64]domain.Notification, len(entityMap))
+	for id := range entityMap {
+		entity := entityMap[id]
+		domainMap[id] = d.toDomain(entity)
+	}
+	return domainMap, nil
 }
 
 func (d *DefaultNotifRepo) toEntity(n domain.Notification) dao.Notification {

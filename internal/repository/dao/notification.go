@@ -42,6 +42,7 @@ type NotificationDAO interface {
 	CreateWithCallback(ctx context.Context, entity Notification) (Notification, error)
 	BatchCreate(ctx context.Context, ns []Notification) ([]Notification, error)
 	BatchCreateWithCallback(ctx context.Context, ns []Notification) ([]Notification, error)
+	BatchUpdateStatus(ctx context.Context, successNs, failureNs []Notification) error
 
 	GetById(ctx context.Context, id uint64) (Notification, error)
 	GetMapByIds(ctx context.Context, ids []uint64) (map[uint64]Notification, error)
@@ -230,6 +231,111 @@ func (nd *NotifShardingDAO) sqlGenerate(db *gorm.DB, ns []*Notification, needCal
 	return strings.Join(sqls, ";"), args, ids
 }
 
+func (nd *NotifShardingDAO) BatchUpdateStatus(ctx context.Context, successNs, failureNs []Notification) error {
+	if len(successNs) == 0 && len(failureNs) == 0 {
+		return nil
+	}
+
+	dbMap := make(map[string]map[string]*modifyIds)
+	for i := range successNs {
+		n := successNs[i]
+		notifDst := nd.notifShardingStrategy.ShardWithId(n.Id)
+		callbackDst := nd.cbLogShardingStrategy.ShardWithId(n.Id)
+
+		tableMap, ok := dbMap[notifDst.DB]
+		if !ok {
+			tableMap = make(map[string]*modifyIds)
+			dbMap[notifDst.DB] = tableMap
+		}
+
+		modifyId, ok := tableMap[notifDst.Table]
+		if ok {
+			modifyId.successIds = append(modifyId.successIds, n.Id)
+		} else {
+			modifyId = &modifyIds{
+				callbackTable: callbackDst.Table,
+				successIds:    []uint64{n.Id},
+				failureIds:    []uint64{},
+			}
+			tableMap[notifDst.Table] = modifyId
+		}
+	}
+
+	for i := range failureNs {
+		n := failureNs[i]
+		notifDst := nd.notifShardingStrategy.ShardWithId(n.Id)
+		callbackDst := nd.cbLogShardingStrategy.ShardWithId(n.Id)
+
+		tableMap, ok := dbMap[notifDst.DB]
+		if !ok {
+			tableMap = make(map[string]*modifyIds)
+			dbMap[notifDst.DB] = tableMap
+		}
+
+		modifyId, ok := tableMap[notifDst.Table]
+		if ok {
+			modifyId.successIds = append(modifyId.successIds, n.Id)
+		} else {
+			modifyId = &modifyIds{
+				callbackTable: callbackDst.Table,
+				successIds:    []uint64{},
+				failureIds:    []uint64{n.Id},
+			}
+			tableMap[notifDst.Table] = modifyId
+		}
+	}
+
+	var eg errgroup.Group
+	for dbName, tableMap := range dbMap {
+		db := dbName
+		tbMap := tableMap
+		eg.Go(func() error {
+			gormDB, ok := nd.dbs.Load(db)
+			if !ok {
+				return fmt.Errorf("fail to load db: %s", db)
+			}
+			return gormDB.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+				return nd.batchMark(tx, tbMap)
+			})
+		})
+	}
+	return eg.Wait()
+}
+
+//goland:noinspection SqlNoDataSourceInspection
+func (nd *NotifShardingDAO) batchMark(tx *gorm.DB, tbMap map[string]*modifyIds) error {
+	now := time.Now().UnixMilli()
+	sqls := make([]string, 0, len(tbMap))
+
+	for tb := range tbMap {
+		m := tbMap[tb]
+		if len(m.successIds) > 0 {
+			notifSQL := fmt.Sprintf(
+				"UPDATE %s SET `version` = `version` + 1, `status` = '%s', `update_at` = %d WHERE `id` IN (%s)",
+				tb, domain.SendStatusSuccess.String(), now, m.successToString(),
+			)
+			cbLogSQL := fmt.Sprintf(
+				"UPDATE %s SET `status` = '%s', `update_at` = %d WHERE `notification_id` IN (%s)",
+				tb, domain.CallbackStatusPending.String(), now, m.successToString(),
+			)
+			sqls = append(sqls, notifSQL, cbLogSQL)
+		}
+		if len(m.failureIds) > 0 {
+			notifSQL := fmt.Sprintf(
+				"UPDATE %s SET `version` = `version` + 1, `status` = '%s', `update_at` = %d WHERE `id` IN (%s)",
+				tb, domain.SendStatusFailure.String(), now, m.successToString(),
+			)
+			sqls = append(sqls, notifSQL)
+		}
+	}
+
+	if len(sqls) == 0 {
+		sql := strings.Join(sqls, "; ")
+		return tx.Exec(sql).Error
+	}
+	return nil
+}
+
 func (nd *NotifShardingDAO) GetById(ctx context.Context, id uint64) (Notification, error) {
 	dst := nd.notifShardingStrategy.ShardWithId(id)
 	db, ok := nd.dbs.Load(dst.DB)
@@ -354,4 +460,26 @@ func NewNotifShardingDAO(
 		cbLogShardingStrategy: cbLogShardingStrategy,
 		idGenerator:           idGenerator,
 	}
+}
+
+type modifyIds struct {
+	callbackTable string
+	successIds    []uint64
+	failureIds    []uint64
+}
+
+func (m *modifyIds) successToString() string {
+	return m.listToString(m.successIds)
+}
+
+func (m *modifyIds) failureToString() string {
+	return m.listToString(m.failureIds)
+}
+
+func (m *modifyIds) listToString(list []uint64) string {
+	s := make([]string, len(list))
+	for i := range list {
+		s[i] = fmt.Sprintf("%d", list[i])
+	}
+	return strings.Join(s, ",")
 }

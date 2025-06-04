@@ -1,4 +1,4 @@
-package notification
+package callback
 
 import (
 	"context"
@@ -18,15 +18,15 @@ import (
 	"google.golang.org/grpc"
 )
 
-type CallbackService interface {
+type Service interface {
 	Send(ctx context.Context, startTime int64, batchSize int) error
 	SendByNotification(ctx context.Context, n domain.Notification) error
 	SendByNotifications(ctx context.Context, ns []domain.Notification) error
 }
 
-var _ CallbackService = (*DefaultCallbackService)(nil)
+var _ Service = (*DefaultService)(nil)
 
-type DefaultCallbackService struct {
+type DefaultService struct {
 	clients *internalGrpc.Clients[clientv1.CallbackServiceClient]
 
 	bizConfRepo     repository.BizConfRepo
@@ -36,7 +36,7 @@ type DefaultCallbackService struct {
 	logger  *zap.Logger
 }
 
-func (d *DefaultCallbackService) Send(ctx context.Context, startTime int64, batchSize int) error {
+func (d *DefaultService) Send(ctx context.Context, startTime int64, batchSize int) error {
 	nextStartId := uint64(0)
 	for {
 		logs, newId, err := d.callbackLogRepo.Find(ctx, startTime, nextStartId, batchSize)
@@ -66,7 +66,7 @@ func (d *DefaultCallbackService) Send(ctx context.Context, startTime int64, batc
 }
 
 // sendAndUpdateLogs 发送回调并更新 callback log
-func (d *DefaultCallbackService) sendAndUpdateLogs(ctx context.Context, logs []domain.CallbackLog) error {
+func (d *DefaultService) sendAndUpdateLogs(ctx context.Context, logs []domain.CallbackLog) error {
 	updateParams := make([]domain.CallbackLog, 0, len(logs))
 	for i := range logs {
 		changed, err := d.sendAndSetChangeFields(ctx, logs[i])
@@ -88,7 +88,7 @@ func (d *DefaultCallbackService) sendAndUpdateLogs(ctx context.Context, logs []d
 
 // sendAndSetChangeFields 实际发送回调请求并判断是否需要更新 callback log 信息
 // 返回 true 表示需要更新信息
-func (d *DefaultCallbackService) sendAndSetChangeFields(ctx context.Context, log domain.CallbackLog) (bool, error) {
+func (d *DefaultService) sendAndSetChangeFields(ctx context.Context, log domain.CallbackLog) (bool, error) {
 	// 实际发送回调
 	resp, err := d.sendCallback(ctx, log.Notification)
 	if err != nil {
@@ -125,7 +125,7 @@ func (d *DefaultCallbackService) sendAndSetChangeFields(ctx context.Context, log
 	return true, nil
 }
 
-func (d *DefaultCallbackService) SendByNotification(ctx context.Context, n domain.Notification) error {
+func (d *DefaultService) SendByNotification(ctx context.Context, n domain.Notification) error {
 	logs, err := d.callbackLogRepo.FindByNotificationIds(ctx, []uint64{n.Id})
 	if err != nil {
 		return err
@@ -133,7 +133,7 @@ func (d *DefaultCallbackService) SendByNotification(ctx context.Context, n domai
 	return d.sendAndUpdateLogs(ctx, logs)
 }
 
-func (d *DefaultCallbackService) SendByNotifications(ctx context.Context, ns []domain.Notification) error {
+func (d *DefaultService) SendByNotifications(ctx context.Context, ns []domain.Notification) error {
 	nIds := make([]uint64, 0, len(ns))
 	m := make(map[uint64]domain.Notification, len(ns))
 
@@ -166,7 +166,7 @@ func (d *DefaultCallbackService) SendByNotifications(ctx context.Context, ns []d
 	return err
 }
 
-func (d *DefaultCallbackService) sendCallback(ctx context.Context, n domain.Notification) (*clientv1.SendResultNotifyResponse, error) {
+func (d *DefaultService) sendCallback(ctx context.Context, n domain.Notification) (*clientv1.SendResultNotifyResponse, error) {
 	conf, err := d.getConf(ctx, n.BizId)
 	if err != nil {
 		d.logger.Warn("[jotify] failed to get biz conf", zap.Uint64("biz_id", n.BizId), zap.Error(err))
@@ -179,7 +179,7 @@ func (d *DefaultCallbackService) sendCallback(ctx context.Context, n domain.Noti
 	return d.clients.Get(conf.ServiceName).SendResultNotify(ctx, d.buildNotifyReq(n))
 }
 
-func (d *DefaultCallbackService) getConf(ctx context.Context, bizId uint64) (*domain.CallbackConf, error) {
+func (d *DefaultService) getConf(ctx context.Context, bizId uint64) (*domain.CallbackConf, error) {
 	conf, ok := d.confMap.Load(bizId)
 	if ok {
 		return conf, nil
@@ -196,7 +196,7 @@ func (d *DefaultCallbackService) getConf(ctx context.Context, bizId uint64) (*do
 	return bizConf.CallbackConf, nil
 }
 
-func (d *DefaultCallbackService) buildNotifyReq(n domain.Notification) *clientv1.SendResultNotifyRequest {
+func (d *DefaultService) buildNotifyReq(n domain.Notification) *clientv1.SendResultNotifyRequest {
 	tplParams := make(map[string]string)
 	if n.Template.Params != nil {
 		tplParams = n.Template.Params
@@ -219,7 +219,7 @@ func (d *DefaultCallbackService) buildNotifyReq(n domain.Notification) *clientv1
 	}
 }
 
-func (d *DefaultCallbackService) getChannel(n domain.Notification) notificationv1.Channel {
+func (d *DefaultService) getChannel(n domain.Notification) notificationv1.Channel {
 	channel := notificationv1.Channel_CHANNEL_UNSPECIFIED
 	switch n.Channel {
 	case domain.ChannelSMS:
@@ -232,7 +232,7 @@ func (d *DefaultCallbackService) getChannel(n domain.Notification) notificationv
 	return channel
 }
 
-func (d *DefaultCallbackService) getStatus(n domain.Notification) notificationv1.SendStatus {
+func (d *DefaultService) getStatus(n domain.Notification) notificationv1.SendStatus {
 	status := notificationv1.SendStatus_STATUS_UNSPECIFIED
 	switch n.Status {
 	case domain.SendStatusSuccess:
@@ -251,16 +251,16 @@ func (d *DefaultCallbackService) getStatus(n domain.Notification) notificationv1
 	return status
 }
 
-func NewDefaultCallbackService(
+func NewDefaultService(
 	etcdClient *clientv3.Client,
 	bizConfRepo repository.BizConfRepo,
 	callbackLogRepo repository.CallbackLogRepo,
 	logger *zap.Logger,
-) *DefaultCallbackService {
+) *DefaultService {
 	clients := internalGrpc.NewClients(etcdClient, func(conn *grpc.ClientConn) clientv1.CallbackServiceClient {
 		return clientv1.NewCallbackServiceClient(conn)
 	})
-	return &DefaultCallbackService{
+	return &DefaultService{
 		clients:         clients,
 		bizConfRepo:     bizConfRepo,
 		callbackLogRepo: callbackLogRepo,

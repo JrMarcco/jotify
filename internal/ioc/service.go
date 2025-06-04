@@ -6,6 +6,7 @@ import (
 	"github.com/JrMarcco/jotify/internal/service/channel"
 	"github.com/JrMarcco/jotify/internal/service/conf"
 	"github.com/JrMarcco/jotify/internal/service/notification"
+	"github.com/JrMarcco/jotify/internal/service/notification/callback"
 	"github.com/JrMarcco/jotify/internal/service/provider"
 	"github.com/JrMarcco/jotify/internal/service/provider/selector"
 	"github.com/JrMarcco/jotify/internal/service/provider/sms"
@@ -49,8 +50,8 @@ var ServiceFxOpt = fx.Options(
 		),
 		// callback service
 		fx.Annotate(
-			notification.NewDefaultCallbackService,
-			fx.As(new(notification.CallbackService)),
+			callback.NewDefaultService,
+			fx.As(new(callback.Service)),
 		),
 		// provider
 		InitTencentSmsClient,

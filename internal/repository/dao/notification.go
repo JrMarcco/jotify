@@ -45,10 +45,13 @@ type NotificationDAO interface {
 	BatchUpdateStatus(ctx context.Context, successNs, failureNs []Notification) error
 
 	GetById(ctx context.Context, id uint64) (Notification, error)
+	GetByKey(ctx context.Context, bizId uint64, bizKey string) (Notification, error)
 	GetMapByIds(ctx context.Context, ids []uint64) (map[uint64]Notification, error)
 
-	MarkSuccess(ctx context.Context, entity Notification) error
-	MarkFailure(ctx context.Context, entity Notification) error
+	MarkSuccess(ctx context.Context, n Notification) error
+	MarkFailure(ctx context.Context, n Notification) error
+
+	CompareAndSwapStatus(ctx context.Context, n Notification) error
 }
 
 var _ NotificationDAO = (*NotifShardingDAO)(nil)
@@ -81,7 +84,7 @@ func (nd *NotifShardingDAO) create(ctx context.Context, n Notification, needCall
 
 	db, ok := nd.dbs.Load(notifDst.DB)
 	if !ok {
-		return Notification{}, fmt.Errorf("fail to load db: %s", notifDst.DB)
+		return Notification{}, fmt.Errorf("failed to load db: %s", notifDst.DB)
 	}
 
 	// 业务上指定 notification 和 callback_log 使用相同的分库规则，即在同一个库中
@@ -91,8 +94,7 @@ func (nd *NotifShardingDAO) create(ctx context.Context, n Notification, needCall
 			if err := tx.Table(notifDst.Table).Create(&n).Error; err != nil {
 				// 创建 notification 记录失败
 				if errors.Is(err, gorm.ErrDuplicatedKey) && IsIdDuplicateErr([]uint64{n.Id}, err) {
-					// 主键冲突，重新生成 id 再执行插入
-					continue
+					return fmt.Errorf("%w", errs.ErrDuplicateNotificationId)
 				}
 				return err
 			}
@@ -159,7 +161,7 @@ func (nd *NotifShardingDAO) tryBatchInsert(ctx context.Context, ns []*Notificati
 		dbNs, _ := m[dbName]
 		db, ok := nd.dbs.Load(dbName)
 		if !ok {
-			return []Notification{}, fmt.Errorf("fail to load db: %s", dbName)
+			return []Notification{}, fmt.Errorf("failed to load db: %s", dbName)
 		}
 
 		eg.Go(func() error {
@@ -292,7 +294,7 @@ func (nd *NotifShardingDAO) BatchUpdateStatus(ctx context.Context, successNs, fa
 		eg.Go(func() error {
 			gormDB, ok := nd.dbs.Load(db)
 			if !ok {
-				return fmt.Errorf("fail to load db: %s", db)
+				return fmt.Errorf("failed to load db: %s", db)
 			}
 			return gormDB.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 				return nd.batchMark(tx, tbMap)
@@ -340,7 +342,7 @@ func (nd *NotifShardingDAO) GetById(ctx context.Context, id uint64) (Notificatio
 	dst := nd.notifShardingStrategy.ShardWithId(id)
 	db, ok := nd.dbs.Load(dst.DB)
 	if !ok {
-		return Notification{}, fmt.Errorf("fail to load db: %s", dst.DB)
+		return Notification{}, fmt.Errorf("failed to load db: %s", dst.DB)
 	}
 
 	var n Notification
@@ -350,6 +352,23 @@ func (nd *NotifShardingDAO) GetById(ctx context.Context, id uint64) (Notificatio
 			return Notification{}, fmt.Errorf("%w: id = %d", errs.ErrNotificationNotFound, id)
 		}
 		return Notification{}, err
+	}
+	return n, nil
+}
+
+func (nd *NotifShardingDAO) GetByKey(ctx context.Context, bizId uint64, bizKey string) (Notification, error) {
+	dst := nd.notifShardingStrategy.Shard(bizId, bizKey)
+	db, ok := nd.dbs.Load(dst.DB)
+	if !ok {
+		return Notification{}, fmt.Errorf("failed to load db: %s", dst.DB)
+	}
+
+	var n Notification
+	err := db.WithContext(ctx).Table(dst.Table).
+		Where("`biz_id` = ? AND `biz_key` = ?", bizId, bizKey).
+		First(&n).Error
+	if err != nil {
+		return Notification{}, fmt.Errorf("failed to get notification, bizId = %d, bizKey = %s, %w", bizId, bizKey, err)
 	}
 	return n, nil
 }
@@ -384,7 +403,7 @@ func (nd *NotifShardingDAO) GetMapByIds(ctx context.Context, ids []uint64) (map[
 			dbName := mapKey[0]
 			db, ok := nd.dbs.Load(dbName)
 			if !ok {
-				return fmt.Errorf("fail to load db: %s", dbName)
+				return fmt.Errorf("failed to load db: %s", dbName)
 			}
 			tableName := mapKey[1]
 			err := db.WithContext(ctx).Table(tableName).Where("id in (?)", mapVal).Find(&ns).Error
@@ -400,29 +419,29 @@ func (nd *NotifShardingDAO) GetMapByIds(ctx context.Context, ids []uint64) (map[
 	return notifMap, eg.Wait()
 }
 
-func (nd *NotifShardingDAO) MarkSuccess(ctx context.Context, entity Notification) error {
+func (nd *NotifShardingDAO) MarkSuccess(ctx context.Context, n Notification) error {
 	now := time.Now().UnixMilli()
-	dst := nd.notifShardingStrategy.ShardWithId(entity.Id)
-	cbLogDst := nd.cbLogShardingStrategy.ShardWithId(entity.Id)
+	dst := nd.notifShardingStrategy.ShardWithId(n.Id)
+	cbLogDst := nd.cbLogShardingStrategy.ShardWithId(n.Id)
 
 	db, ok := nd.dbs.Load(dst.DB)
 	if !ok {
-		return fmt.Errorf("fail to load db: %s", dst.DB)
+		return fmt.Errorf("failed to load db: %s", dst.DB)
 	}
 
 	return db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		err := tx.Table(dst.Table).Model(&Notification{}).Where("id = ?", entity.Id).
+		err := tx.Table(dst.Table).Model(&Notification{}).Where("id = ?", n.Id).
 			Updates(map[string]any{
-				"status":    entity.Status,
+				"status":    n.Status,
 				"update_at": now,
-				"version":   gorm.Expr("version + 1"),
+				"version":   gorm.Expr("`version` + 1"),
 			}).Error
 		if err != nil {
 			return err
 		}
 
 		// 标记 callback log 状态为 pending（可发送）
-		return tx.Table(cbLogDst.Table).Model(&CallbackLog{}).Where("notification_id = ?", entity.Id).
+		return tx.Table(cbLogDst.Table).Model(&CallbackLog{}).Where("notification_id = ?", n.Id).
 			Updates(map[string]any{
 				"status":    domain.CallbackStatusPending,
 				"update_at": now,
@@ -430,22 +449,46 @@ func (nd *NotifShardingDAO) MarkSuccess(ctx context.Context, entity Notification
 	})
 }
 
-func (nd *NotifShardingDAO) MarkFailure(ctx context.Context, entity Notification) error {
+func (nd *NotifShardingDAO) MarkFailure(ctx context.Context, n Notification) error {
 	now := time.Now().UnixMilli()
-	dst := nd.notifShardingStrategy.ShardWithId(entity.Id)
+	dst := nd.notifShardingStrategy.ShardWithId(n.Id)
 	db, ok := nd.dbs.Load(dst.DB)
 	if !ok {
-		return fmt.Errorf("fail to load db: %s", dst.DB)
+		return fmt.Errorf("failed to load db: %s", dst.DB)
 	}
 
 	return db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		return tx.Table(dst.Table).Model(&Notification{}).Where("id = ?", entity.Id).
+		return tx.Table(dst.Table).Model(&Notification{}).Where("id = ?", n.Id).
 			Updates(map[string]any{
-				"status":    entity.Status,
+				"status":    n.Status,
 				"update_at": now,
-				"version":   gorm.Expr("version + 1"),
+				"version":   gorm.Expr("`version` + 1"),
 			}).Error
 	})
+}
+
+func (nd *NotifShardingDAO) CompareAndSwapStatus(ctx context.Context, n Notification) error {
+	dst := nd.notifShardingStrategy.ShardWithId(n.Id)
+	db, ok := nd.dbs.Load(dst.DB)
+	if !ok {
+		return fmt.Errorf("failed to load db: %s", dst.DB)
+	}
+
+	res := db.WithContext(ctx).Table(dst.Table).
+		Where("`id` = ? AND `version` = ?", n.Id, n.Version).
+		Updates(map[string]any{
+			"status":    n.Status,
+			"version":   gorm.Expr("`version` + 1"),
+			"update_at": time.Now().UnixMilli(),
+		})
+	if res.Error != nil {
+		return res.Error
+	}
+
+	if res.RowsAffected < 0 {
+		return fmt.Errorf("%w: failed to concurrent competition", res.Error)
+	}
+	return nil
 }
 
 func NewNotifShardingDAO(

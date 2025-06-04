@@ -18,7 +18,7 @@ type SeqSelector struct {
 
 func (ss *SeqSelector) Next(ctx context.Context, n domain.Notification) (provider.Provider, error) {
 	if len(ss.providers) == ss.index {
-		return nil, fmt.Errorf("%w", errs.ErrNoAvailableProvider)
+		return nil, fmt.Errorf("%w", errs.ErrNotAvailableProvider)
 	}
 
 	p := ss.providers[ss.index]

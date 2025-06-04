@@ -8,7 +8,7 @@ import (
 	"github.com/JrMarcco/jotify/internal/domain"
 	"github.com/JrMarcco/jotify/internal/repository"
 	"github.com/JrMarcco/jotify/internal/service/channel"
-	"github.com/JrMarcco/jotify/internal/service/notification"
+	"github.com/JrMarcco/jotify/internal/service/notification/callback"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 )
@@ -33,7 +33,7 @@ type DefaultSender struct {
 	notifRepo   repository.NotificationRepo
 	bizConfRepo repository.BizConfRepo
 
-	callbackSvc notification.CallbackService
+	callbackSvc callback.Service
 
 	logger *zap.Logger
 }
@@ -154,7 +154,7 @@ func NewDefaultSender(
 	channel channel.Channel,
 	notifRepo repository.NotificationRepo,
 	bizConfRepo repository.BizConfRepo,
-	callbackSvc notification.CallbackService,
+	callbackSvc callback.Service,
 	logger *zap.Logger,
 ) *DefaultSender {
 	return &DefaultSender{

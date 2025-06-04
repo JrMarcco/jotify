@@ -20,11 +20,14 @@ type NotificationRepo interface {
 	CreateWithCallback(ctx context.Context, n domain.Notification) (domain.Notification, error)
 	BatchCreate(ctx context.Context, ns []domain.Notification) ([]domain.Notification, error)
 	BatchCreateWithCallback(ctx context.Context, ns []domain.Notification) ([]domain.Notification, error)
-	BatchUpdateStatus(ctx context.Context, successNs, failure []domain.Notification) error
+	BatchUpdateStatus(ctx context.Context, successNs, failureNs []domain.Notification) error
 	MarkSuccess(ctx context.Context, n domain.Notification) error
 	MarkFailure(ctx context.Context, n domain.Notification) error
 
 	GetMapByIds(ctx context.Context, ids []uint64) (map[uint64]domain.Notification, error)
+	GetByKey(ctx context.Context, bizId uint64, bizKey string) (domain.Notification, error)
+
+	CompareAndSwapStatus(ctx context.Context, n domain.Notification) error
 }
 
 const (
@@ -141,10 +144,34 @@ func (d *DefaultNotifRepo) BatchCreateWithCallback(ctx context.Context, ns []dom
 	}), nil
 }
 
+func (d *DefaultNotifRepo) BatchUpdateStatus(ctx context.Context, successNs, failureNs []domain.Notification) error {
+	successEntities := make([]dao.Notification, len(successNs))
+	for i := range successNs {
+		successEntities[i] = d.toEntity(successNs[i])
+	}
+
+	failureEntities := make([]dao.Notification, len(failureNs))
+	for i := range failureNs {
+		failureEntities[i] = d.toEntity(failureNs[i])
+	}
+
+	err := d.notifDAO.BatchUpdateStatus(ctx, successEntities, failureEntities)
+	if err != nil {
+		return err
+	}
+
+	params := d.buildQuotaParams(failureNs)
+	err = d.quotaCache.BatchIncr(ctx, params)
+	if err != nil {
+		d.logger.Error("[jotify] failed to batch update quota", zap.Error(err))
+	}
+	return nil
+}
+
 func (d *DefaultNotifRepo) buildQuotaParams(ns []domain.Notification) []cache.QuotaParam {
 	m := make(map[string]cache.QuotaParam)
 	for _, n := range ns {
-		key := fmt.Sprintf("%s:%s", n.BizId, n.Channel.String())
+		key := fmt.Sprintf("%d:%s", n.BizId, n.Channel.String())
 		param, ok := m[key]
 		if !ok {
 			param = cache.QuotaParam{
@@ -156,11 +183,6 @@ func (d *DefaultNotifRepo) buildQuotaParams(ns []domain.Notification) []cache.Qu
 		m[key] = param
 	}
 	return xmap.Vals(m)
-}
-
-func (d *DefaultNotifRepo) BatchUpdateStatus(ctx context.Context, successNs, failure []domain.Notification) error {
-	//TODO implement me
-	panic("implement me")
 }
 
 func (d *DefaultNotifRepo) MarkSuccess(ctx context.Context, n domain.Notification) error {
@@ -191,6 +213,18 @@ func (d *DefaultNotifRepo) GetMapByIds(ctx context.Context, ids []uint64) (map[u
 		domainMap[id] = d.toDomain(entity)
 	}
 	return domainMap, nil
+}
+
+func (d *DefaultNotifRepo) GetByKey(ctx context.Context, bizId uint64, bizKey string) (domain.Notification, error) {
+	n, err := d.notifDAO.GetByKey(ctx, bizId, bizKey)
+	if err != nil {
+		return domain.Notification{}, err
+	}
+	return d.toDomain(n), nil
+}
+
+func (d *DefaultNotifRepo) CompareAndSwapStatus(ctx context.Context, n domain.Notification) error {
+	return d.notifDAO.CompareAndSwapStatus(ctx, d.toEntity(n))
 }
 
 func (d *DefaultNotifRepo) toEntity(n domain.Notification) dao.Notification {

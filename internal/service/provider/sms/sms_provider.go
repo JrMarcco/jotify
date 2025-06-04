@@ -80,7 +80,7 @@ func (p *Provider) getTemplate(ctx context.Context, templateId uint64) (domain.C
 		return domain.ChannelTpl{}, err
 	}
 	if len(providers) == 0 {
-		return domain.ChannelTpl{}, fmt.Errorf("%w: template id = %d, version id = %d", errs.ErrNoAvailableProvider, tpl.Id, version.Id)
+		return domain.ChannelTpl{}, fmt.Errorf("%w: template id = %d, version id = %d", errs.ErrNotAvailableProvider, tpl.Id, version.Id)
 	}
 
 	version.Providers = providers

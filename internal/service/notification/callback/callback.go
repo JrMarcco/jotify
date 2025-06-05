@@ -10,7 +10,7 @@ import (
 	notificationv1 "github.com/JrMarcco/jotify-api/api/notification/v1"
 	"github.com/JrMarcco/jotify/internal/domain"
 	"github.com/JrMarcco/jotify/internal/errs"
-	internalGrpc "github.com/JrMarcco/jotify/internal/pkg/grpc"
+	grpcpkg "github.com/JrMarcco/jotify/internal/pkg/grpc"
 	"github.com/JrMarcco/jotify/internal/pkg/retry"
 	"github.com/JrMarcco/jotify/internal/repository"
 	clientv3 "go.etcd.io/etcd/client/v3"
@@ -27,7 +27,7 @@ type Service interface {
 var _ Service = (*DefaultService)(nil)
 
 type DefaultService struct {
-	clients *internalGrpc.Clients[clientv1.CallbackServiceClient]
+	clients *grpcpkg.Clients[clientv1.CallbackServiceClient]
 
 	bizConfRepo     repository.BizConfRepo
 	callbackLogRepo repository.CallbackLogRepo
@@ -257,7 +257,7 @@ func NewDefaultService(
 	callbackLogRepo repository.CallbackLogRepo,
 	logger *zap.Logger,
 ) *DefaultService {
-	clients := internalGrpc.NewClients(etcdClient, func(conn *grpc.ClientConn) clientv1.CallbackServiceClient {
+	clients := grpcpkg.NewClients(etcdClient, func(conn *grpc.ClientConn) clientv1.CallbackServiceClient {
 		return clientv1.NewCallbackServiceClient(conn)
 	})
 	return &DefaultService{

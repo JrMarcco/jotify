@@ -5,23 +5,26 @@ import (
 	"log"
 
 	"github.com/JrMarcco/easy-kit/xsync"
-	clientv3 "go.etcd.io/etcd/client/v3"
-	"go.etcd.io/etcd/client/v3/naming/resolver"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/balancer"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/resolver"
 )
 
 type Clients[T any] struct {
-	etcdClient *clientv3.Client
-
 	clientMap xsync.Map[string, T]
-	creator   func(conn *grpc.ClientConn) T
+
+	rb       resolver.Builder
+	bb       balancer.Builder
+	insecure bool
+
+	creator func(conn *grpc.ClientConn) T
 }
 
 func (c *Clients[T]) Get(serviceName string) T {
 	client, ok := c.clientMap.Load(serviceName)
 	if !ok {
-		conn, err := c.createGrpcConn(serviceName)
+		conn, err := c.dial(serviceName)
 		if err != nil {
 			log.Panicf("failed to create grpc client for service %s: %v", serviceName, err)
 		}
@@ -32,26 +35,29 @@ func (c *Clients[T]) Get(serviceName string) T {
 	return client
 }
 
-func (c *Clients[T]) createGrpcConn(serviceName string) (*grpc.ClientConn, error) {
-	etcdResolver, err := resolver.NewBuilder(c.etcdClient)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create etcd resolver: %w", err)
+func (c *Clients[T]) dial(serviceName string) (*grpc.ClientConn, error) {
+	opts := []grpc.DialOption{
+		grpc.WithResolvers(c.rb),
+		grpc.WithNoProxy(),
 	}
 
-	conn, err := grpc.NewClient(
-		fmt.Sprintf("etcd:///%s", serviceName),
-		grpc.WithResolvers(etcdResolver),
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create grpc client: %w", err)
+	if c.insecure {
+		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	}
-	return conn, nil
+
+	if c.bb != nil {
+		opts = append(opts, grpc.WithDefaultServiceConfig(
+			fmt.Sprintf(`{"loadBalancingPolicy: %q"}`, c.bb.Name()),
+		))
+	}
+	addr := fmt.Sprintf("registry:///%s", serviceName)
+	return grpc.NewClient(addr, opts...)
 }
 
-func NewClients[T any](etcdClient *clientv3.Client, creator func(conn *grpc.ClientConn) T) *Clients[T] {
+func NewClients[T any](rb resolver.Builder, bb balancer.Builder, creator func(conn *grpc.ClientConn) T) *Clients[T] {
 	return &Clients[T]{
-		etcdClient: etcdClient,
-		creator:    creator,
+		rb:      rb,
+		bb:      bb,
+		creator: creator,
 	}
 }

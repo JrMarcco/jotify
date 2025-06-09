@@ -5,21 +5,29 @@ import (
 	"crypto/ed25519"
 	"crypto/x509"
 	"encoding/pem"
+	"time"
 
+	clientv1 "github.com/JrMarcco/jotify-api/api/client/v1"
 	notificationv1 "github.com/JrMarcco/jotify-api/api/notification/v1"
 	grpcapi "github.com/JrMarcco/jotify/internal/api/grpc"
 	"github.com/JrMarcco/jotify/internal/api/grpc/interceptor/jwt"
+	clientpkg "github.com/JrMarcco/jotify/internal/pkg/client"
+	grpcpkg "github.com/JrMarcco/jotify/internal/pkg/grpc"
+	"github.com/JrMarcco/jotify/internal/pkg/registry"
 	"github.com/spf13/viper"
 	"go.uber.org/fx"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/balancer"
+	"google.golang.org/grpc/balancer/base"
 )
 
 var GrpcFxOpt = fx.Provide(
-	InitGrpcServer,
+	InitNotificationGrpcServer,
+	InitCallbackGrpcClients,
 	grpcapi.NewNotificationServer,
 )
 
-func InitGrpcServer(server *grpcapi.NotificationServer) *grpc.Server {
+func InitNotificationGrpcServer(server *grpcapi.NotificationServer) *grpc.Server {
 	type Config struct {
 		PriPem string `mapstructure:"private"`
 		PubPem string `mapstructure:"public"`
@@ -83,4 +91,33 @@ func InterceptorOf(interceptors ...grpc.UnaryServerInterceptor) grpc.UnaryServer
 		}
 		return chainedHandler(ctx, req)
 	}
+}
+
+func InitCallbackGrpcClients(r registry.Registry) *grpcpkg.Clients[clientv1.CallbackServiceClient] {
+	type Config struct {
+		Name    string `mapstructure:"name"`
+		Timeout int    `mapstructure:"timeout"`
+	}
+
+	cfg := &Config{}
+	if err := viper.UnmarshalKey("load_balance", cfg); err != nil {
+		panic(err)
+	}
+
+	// 创建负载均衡 builder
+	bb := base.NewBalancerBuilder(
+		cfg.Name,
+		clientpkg.NewRwWeightBalancerBuilder(),
+		base.Config{HealthCheck: true},
+	)
+	// 注册负载均衡 builder
+	balancer.Register(bb)
+
+	return grpcpkg.NewClients(
+		clientpkg.NewGrpcResolverBuilder(r, time.Duration(cfg.Timeout)*time.Millisecond),
+		bb,
+		func(conn *grpc.ClientConn) clientv1.CallbackServiceClient {
+			return clientv1.NewCallbackServiceClient(conn)
+		},
+	)
 }

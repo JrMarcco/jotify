@@ -13,9 +13,7 @@ import (
 	grpcpkg "github.com/JrMarcco/jotify/internal/pkg/grpc"
 	"github.com/JrMarcco/jotify/internal/pkg/retry"
 	"github.com/JrMarcco/jotify/internal/repository"
-	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.uber.org/zap"
-	"google.golang.org/grpc"
 )
 
 type Service interface {
@@ -252,14 +250,11 @@ func (d *DefaultService) getStatus(n domain.Notification) notificationv1.SendSta
 }
 
 func NewDefaultService(
-	etcdClient *clientv3.Client,
+	clients *grpcpkg.Clients[clientv1.CallbackServiceClient],
 	bizConfRepo repository.BizConfRepo,
 	callbackLogRepo repository.CallbackLogRepo,
 	logger *zap.Logger,
 ) *DefaultService {
-	clients := grpcpkg.NewClients(etcdClient, func(conn *grpc.ClientConn) clientv1.CallbackServiceClient {
-		return clientv1.NewCallbackServiceClient(conn)
-	})
 	return &DefaultService{
 		clients:         clients,
 		bizConfRepo:     bizConfRepo,

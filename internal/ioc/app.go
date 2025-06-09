@@ -73,29 +73,29 @@ func AppLifecycle(lc fx.Lifecycle, app *App) {
 
 			// 启动 gRPC 服务器
 			go func() {
-				if err := app.grpcServer.Serve(lis); err != nil {
-					panic(err)
+				if serveErr := app.grpcServer.Serve(lis); err != nil {
+					panic(serveErr)
 				}
 			}()
 
 			// 注册服务到注册中心
 			if app.registry != nil {
 				registerCtx, cancel := context.WithTimeout(context.Background(), app.timeout)
-				defer cancel()
+				regErr := app.registry.Register(registerCtx, si)
+				cancel()
 
-				if err := app.registry.Register(registerCtx, si); err != nil {
-					return err
+				if regErr != nil {
+					return regErr
 				}
 			}
-
 			return nil
 		},
 		OnStop: func(ctx context.Context) error {
 			// 从注册中心注销服务
-			if app.registry != nil {
-				unregisterCtx, cancel := context.WithTimeout(context.Background(), app.timeout)
-				defer cancel()
+			unregisterCtx, cancel := context.WithTimeout(context.Background(), app.timeout)
+			defer cancel()
 
+			if app.registry != nil {
 				if err := app.registry.Unregister(unregisterCtx, app.si); err != nil {
 					// 记录错误但不返回，确保服务器能够正常关闭
 					app.logger.Error("[jotify] unregister service failed", zap.Error(err))

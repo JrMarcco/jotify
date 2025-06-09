@@ -94,7 +94,7 @@ func (b *InterceptorBuilder) Build() grpc.UnaryServerInterceptor {
 			return nil, status.Errorf(codes.Unauthenticated, "invalid token: %s", err.Error())
 		}
 
-		if val, ok := mc[BizIdParamName]; ok {
+		if val, ok := mc[bizIdParamName]; ok {
 			// 设置业务 id 到 context
 			bizId := uint64(val.(float64))
 			ctx = context.WithValue(ctx, BizIdContextKey{}, bizId)

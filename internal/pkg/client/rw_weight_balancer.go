@@ -11,6 +11,8 @@ import (
 	"google.golang.org/grpc/balancer/base"
 )
 
+var _ base.PickerBuilder = (*RwWeightBalancerBuilder)(nil)
+
 type RwWeightBalancerBuilder struct {
 	mu        sync.RWMutex
 	nodeCache map[string]*rwWeightServiceNode
@@ -152,20 +154,25 @@ func (p *RwReadWeightBalancer) Pick(info balancer.PickInfo) (balancer.PickResult
 			isDecrementErr := info.Err != nil && (errors.Is(info.Err, context.DeadlineExceeded) || errors.Is(info.Err, io.EOF))
 			const twice = 2
 			if isWriteReq {
-				if isDecrementErr && selectedNode.efficientWriteWeight > 0 {
-					selectedNode.efficientWriteWeight--
-				} else if info.Err == nil {
+				if info.Err == nil {
 					selectedNode.efficientWriteWeight++
 					selectedNode.currentWriteWeight = max(selectedNode.efficientWriteWeight, selectedNode.writeWeight*twice)
+					return
+				}
+				if isDecrementErr && selectedNode.efficientWriteWeight > 1 {
+					selectedNode.efficientWriteWeight--
 				}
 				return
 			}
 
-			if isDecrementErr && selectedNode.efficientReadWeight > 0 {
-				selectedNode.efficientReadWeight--
-			} else if info.Err == nil {
+			if info.Err == nil {
 				selectedNode.efficientReadWeight++
 				selectedNode.currentReadWeight = max(selectedNode.efficientReadWeight, selectedNode.readWeight*twice)
+				return
+			}
+
+			if isDecrementErr && selectedNode.efficientReadWeight > 1 {
+				selectedNode.efficientReadWeight--
 			}
 		},
 	}, nil

@@ -92,7 +92,7 @@ func (nd *NotifShardingDAO) create(ctx context.Context, n Notification, needCall
 		for {
 			n.Id = nd.idGenerator.NextId(n.BizId, n.BizKey)
 			if err := tx.Table(notifDst.Table).Create(&n).Error; err != nil {
-				// 创建 notification 记录失败
+				// 创建 notification 记录失败，如果是主键冲突直接返回错误
 				if errors.Is(err, gorm.ErrDuplicatedKey) && IsIdDuplicateErr([]uint64{n.Id}, err) {
 					return fmt.Errorf("%w", errs.ErrDuplicateNotificationId)
 				}

@@ -26,6 +26,7 @@ func (s *ImmediateSendStrategy) Send(ctx context.Context, n domain.Notification)
 	}
 
 	if !errors.Is(err, errs.ErrDuplicateNotificationId) {
+		// 非主键冲突，直接返回错误
 		return domain.SendResp{}, fmt.Errorf("%w: failed to create notification", err)
 	}
 

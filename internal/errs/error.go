@@ -25,4 +25,6 @@ var (
 	ErrFailedToSendNotification  = errors.New("[jotify] failed to send notification")
 
 	ErrDuplicateNotificationId = errors.New("[jotify] duplicate notification id")
+
+	ErrAcquireExceedLimit = errors.New("[jotify] acquire resource exceed the limit")
 )

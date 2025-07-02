@@ -21,7 +21,7 @@ var AppFxInvoke = fx.Invoke(
 )
 
 type App struct {
-	grpcServer *grpc.Server
+	*grpc.Server
 
 	timeout         time.Duration
 	registry        registry.Registry
@@ -38,7 +38,7 @@ func (app *App) Start() error {
 
 	// 启动 gRPC 服务器
 	go func() {
-		if serveErr := app.grpcServer.Serve(ln); err != nil {
+		if serveErr := app.Serve(ln); err != nil {
 			panic(serveErr)
 		}
 	}()
@@ -72,7 +72,7 @@ func (app *App) Close() {
 	}
 
 	// 优雅退出
-	app.grpcServer.GracefulStop()
+	app.GracefulStop()
 }
 
 func InitApp(grpcServer *grpc.Server, r registry.Registry, zLogger *zap.Logger) *App {
@@ -98,7 +98,7 @@ func InitApp(grpcServer *grpc.Server, r registry.Registry, zLogger *zap.Logger) 
 	}
 
 	return &App{
-		grpcServer:      grpcServer,
+		Server:          grpcServer,
 		timeout:         time.Duration(cfg.Timeout) * time.Millisecond,
 		registry:        r,
 		serviceInstance: serviceInstance,

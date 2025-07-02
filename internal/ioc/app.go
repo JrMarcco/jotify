@@ -23,11 +23,58 @@ var AppFxInvoke = fx.Invoke(
 type App struct {
 	grpcServer *grpc.Server
 
-	timeout  time.Duration
-	registry registry.Registry
-	si       registry.ServiceInstance
+	timeout         time.Duration
+	registry        registry.Registry
+	serviceInstance registry.ServiceInstance
 
 	logger *zap.Logger
+}
+
+func (app *App) Start() error {
+	si := app.serviceInstance
+
+	ln, err := net.Listen("tcp", si.Addr)
+	if err != nil {
+		return err
+	}
+
+	// 启动 gRPC 服务器
+	go func() {
+		if serveErr := app.grpcServer.Serve(ln); err != nil {
+			panic(serveErr)
+		}
+	}()
+
+	// 注册服务到注册中心
+	if app.registry != nil {
+		registerCtx, cancel := context.WithTimeout(context.Background(), app.timeout)
+		regErr := app.registry.Register(registerCtx, si)
+		cancel()
+
+		if regErr != nil {
+			return regErr
+		}
+	}
+	return nil
+}
+
+func (app *App) Close() {
+	if app.registry != nil {
+		// 从注册中心注销服务
+		unregisterCtx, cancel := context.WithTimeout(context.Background(), app.timeout)
+		err := app.registry.Unregister(unregisterCtx, app.serviceInstance)
+		cancel()
+
+		if err != nil {
+			// 记录错误但不返回，确保服务器能够正常关闭
+			app.logger.Error("[jotify] unregister service failed", zap.Error(err))
+		}
+
+		_ = app.registry.Close()
+	}
+
+	// 优雅退出
+	app.grpcServer.GracefulStop()
 }
 
 func InitApp(grpcServer *grpc.Server, r registry.Registry, zLogger *zap.Logger) *App {
@@ -44,7 +91,7 @@ func InitApp(grpcServer *grpc.Server, r registry.Registry, zLogger *zap.Logger) 
 		panic(err)
 	}
 
-	si := registry.ServiceInstance{
+	serviceInstance := registry.ServiceInstance{
 		Name:        cfg.Name,
 		Addr:        cfg.Addr,
 		Group:       cfg.Group,
@@ -53,57 +100,21 @@ func InitApp(grpcServer *grpc.Server, r registry.Registry, zLogger *zap.Logger) 
 	}
 
 	return &App{
-		grpcServer: grpcServer,
-		timeout:    time.Duration(cfg.Timeout) * time.Millisecond,
-		registry:   r,
-		si:         si,
-		logger:     zLogger,
+		grpcServer:      grpcServer,
+		timeout:         time.Duration(cfg.Timeout) * time.Millisecond,
+		registry:        r,
+		serviceInstance: serviceInstance,
+		logger:          zLogger,
 	}
 }
 
 func AppLifecycle(lc fx.Lifecycle, app *App) {
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
-			si := app.si
-
-			ln, err := net.Listen("tcp", si.Addr)
-			if err != nil {
-				return err
-			}
-
-			// 启动 gRPC 服务器
-			go func() {
-				if serveErr := app.grpcServer.Serve(ln); err != nil {
-					panic(serveErr)
-				}
-			}()
-
-			// 注册服务到注册中心
-			if app.registry != nil {
-				registerCtx, cancel := context.WithTimeout(context.Background(), app.timeout)
-				regErr := app.registry.Register(registerCtx, si)
-				cancel()
-
-				if regErr != nil {
-					return regErr
-				}
-			}
-			return nil
+			return app.Start()
 		},
 		OnStop: func(ctx context.Context) error {
-			// 从注册中心注销服务
-			unregisterCtx, cancel := context.WithTimeout(context.Background(), app.timeout)
-			defer cancel()
-
-			if app.registry != nil {
-				if err := app.registry.Unregister(unregisterCtx, app.si); err != nil {
-					// 记录错误但不返回，确保服务器能够正常关闭
-					app.logger.Error("[jotify] unregister service failed", zap.Error(err))
-				}
-			}
-
-			// 优雅退出
-			app.grpcServer.GracefulStop()
+			app.Close()
 			return nil
 		},
 	})

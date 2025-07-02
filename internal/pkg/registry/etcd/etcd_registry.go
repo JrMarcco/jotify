@@ -22,8 +22,8 @@ var _ registry.Registry = (*Registry)(nil)
 type Registry struct {
 	mu sync.Mutex
 
-	client      *clientv3.Client
-	session     *concurrency.Session
+	etcdClient  *clientv3.Client
+	etcdSession *concurrency.Session
 	watchCancel []context.CancelFunc
 }
 
@@ -32,12 +32,12 @@ func (r *Registry) Register(ctx context.Context, si registry.ServiceInstance) er
 	if err != nil {
 		return err
 	}
-	_, err = r.client.Put(ctx, r.siKey(si), string(val), clientv3.WithLease(r.session.Lease()))
+	_, err = r.etcdClient.Put(ctx, r.siKey(si), string(val), clientv3.WithLease(r.etcdSession.Lease()))
 	return err
 }
 
 func (r *Registry) Unregister(ctx context.Context, si registry.ServiceInstance) error {
-	_, err := r.client.Delete(ctx, r.siKey(si))
+	_, err := r.etcdClient.Delete(ctx, r.siKey(si))
 	return err
 }
 
@@ -46,7 +46,7 @@ func (r *Registry) siKey(si registry.ServiceInstance) string {
 }
 
 func (r *Registry) ListService(ctx context.Context, serviceName string) ([]registry.ServiceInstance, error) {
-	resp, err := r.client.Get(ctx, r.serviceKey(serviceName), clientv3.WithPrefix())
+	resp, err := r.etcdClient.Get(ctx, r.serviceKey(serviceName), clientv3.WithPrefix())
 	if err != nil {
 		return nil, err
 	}
@@ -70,7 +70,7 @@ func (r *Registry) Subscribe(serviceName string) <-chan registry.Event {
 	r.watchCancel = append(r.watchCancel, cancel)
 	r.mu.Unlock()
 
-	ch := r.client.Watch(ctx, r.serviceKey(serviceName), clientv3.WithPrefix())
+	ch := r.etcdClient.Watch(ctx, r.serviceKey(serviceName), clientv3.WithPrefix())
 	res := make(chan registry.Event)
 
 	go func() {
@@ -110,7 +110,7 @@ func (r *Registry) Close() error {
 	for _, cancel := range r.watchCancel {
 		cancel()
 	}
-	return r.session.Close()
+	return r.etcdSession.Close()
 }
 
 func NewRegistry(client *clientv3.Client) (*Registry, error) {
@@ -119,7 +119,7 @@ func NewRegistry(client *clientv3.Client) (*Registry, error) {
 		return nil, err
 	}
 	return &Registry{
-		session: session,
-		client:  client,
+		etcdSession: session,
+		etcdClient:  client,
 	}, nil
 }

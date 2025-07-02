@@ -1,4 +1,4 @@
-package client
+package balancer
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"io"
 	"sync"
 
+	"github.com/JrMarcco/jotify/internal/pkg/client"
 	"google.golang.org/grpc/balancer"
 	"google.golang.org/grpc/balancer/base"
 	"google.golang.org/grpc/codes"
@@ -20,7 +21,7 @@ func (b *DynamicWeightBalancerBuilder) Build(info base.PickerBuildInfo) balancer
 	nodes := make([]*dynamicServiceNode, 0, len(info.ReadySCs))
 
 	for cc, ccInfo := range info.ReadySCs {
-		weight, _ := ccInfo.Address.Attributes.Value(attrWeight).(int32)
+		weight, _ := ccInfo.Address.Attributes.Value(client.AttrWeight).(int32)
 		nodes = append(nodes, &dynamicServiceNode{
 			cc:              cc,
 			weight:          weight,

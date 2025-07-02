@@ -1,4 +1,4 @@
-package registry
+package etcd
 
 import (
 	"context"
@@ -6,19 +6,20 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/JrMarcco/jotify/internal/pkg/registry"
 	"go.etcd.io/etcd/api/v3/mvccpb"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.etcd.io/etcd/client/v3/concurrency"
 )
 
-var typeMap = map[mvccpb.Event_EventType]EventType{
-	mvccpb.PUT:    EventTypePut,
-	mvccpb.DELETE: EventTypeDelete,
+var typeMap = map[mvccpb.Event_EventType]registry.EventType{
+	mvccpb.PUT:    registry.EventTypePut,
+	mvccpb.DELETE: registry.EventTypeDel,
 }
 
-var _ Registry = (*EtcdRegistry)(nil)
+var _ registry.Registry = (*Registry)(nil)
 
-type EtcdRegistry struct {
+type Registry struct {
 	mu sync.Mutex
 
 	client      *clientv3.Client
@@ -26,7 +27,7 @@ type EtcdRegistry struct {
 	watchCancel []context.CancelFunc
 }
 
-func (r *EtcdRegistry) Register(ctx context.Context, si ServiceInstance) error {
+func (r *Registry) Register(ctx context.Context, si registry.ServiceInstance) error {
 	val, err := json.Marshal(si)
 	if err != nil {
 		return err
@@ -35,24 +36,24 @@ func (r *EtcdRegistry) Register(ctx context.Context, si ServiceInstance) error {
 	return err
 }
 
-func (r *EtcdRegistry) Unregister(ctx context.Context, si ServiceInstance) error {
+func (r *Registry) Unregister(ctx context.Context, si registry.ServiceInstance) error {
 	_, err := r.client.Delete(ctx, r.siKey(si))
 	return err
 }
 
-func (r *EtcdRegistry) siKey(si ServiceInstance) string {
+func (r *Registry) siKey(si registry.ServiceInstance) string {
 	return fmt.Sprintf("/notification/%s/%s", si.Name, si.Addr)
 }
 
-func (r *EtcdRegistry) ListService(ctx context.Context, serviceName string) ([]ServiceInstance, error) {
+func (r *Registry) ListService(ctx context.Context, serviceName string) ([]registry.ServiceInstance, error) {
 	resp, err := r.client.Get(ctx, r.serviceKey(serviceName), clientv3.WithPrefix())
 	if err != nil {
 		return nil, err
 	}
 
-	res := make([]ServiceInstance, 0, len(resp.Kvs))
+	res := make([]registry.ServiceInstance, 0, len(resp.Kvs))
 	for _, kv := range resp.Kvs {
-		var si ServiceInstance
+		var si registry.ServiceInstance
 		if err := json.Unmarshal(kv.Value, &si); err != nil {
 			return nil, err
 		}
@@ -61,7 +62,7 @@ func (r *EtcdRegistry) ListService(ctx context.Context, serviceName string) ([]S
 	return res, nil
 }
 
-func (r *EtcdRegistry) Subscribe(serviceName string) <-chan Event {
+func (r *Registry) Subscribe(serviceName string) <-chan registry.Event {
 	ctx, cancel := context.WithCancel(context.Background())
 	ctx = clientv3.WithRequireLeader(ctx)
 
@@ -70,7 +71,7 @@ func (r *EtcdRegistry) Subscribe(serviceName string) <-chan Event {
 	r.mu.Unlock()
 
 	ch := r.client.Watch(ctx, r.serviceKey(serviceName), clientv3.WithPrefix())
-	res := make(chan Event)
+	res := make(chan registry.Event)
 
 	go func() {
 		for {
@@ -88,7 +89,7 @@ func (r *EtcdRegistry) Subscribe(serviceName string) <-chan Event {
 
 				for _, e := range resp.Events {
 					// 事件类型转换：mvccpb.Event_EventType -> registry.EventType
-					res <- Event{
+					res <- registry.Event{
 						Type: typeMap[e.Type],
 					}
 				}
@@ -98,11 +99,11 @@ func (r *EtcdRegistry) Subscribe(serviceName string) <-chan Event {
 	return res
 }
 
-func (r *EtcdRegistry) serviceKey(serviceName string) string {
+func (r *Registry) serviceKey(serviceName string) string {
 	return fmt.Sprintf("/notification/%s", serviceName)
 }
 
-func (r *EtcdRegistry) Close() error {
+func (r *Registry) Close() error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -112,12 +113,12 @@ func (r *EtcdRegistry) Close() error {
 	return r.session.Close()
 }
 
-func NewEtcdRegistry(client *clientv3.Client) (*EtcdRegistry, error) {
+func NewRegistry(client *clientv3.Client) (*Registry, error) {
 	session, err := concurrency.NewSession(client)
 	if err != nil {
 		return nil, err
 	}
-	return &EtcdRegistry{
+	return &Registry{
 		session: session,
 		client:  client,
 	}, nil

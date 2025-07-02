@@ -1,9 +1,10 @@
-package client
+package resolver
 
 import (
 	"context"
 	"time"
 
+	"github.com/JrMarcco/jotify/internal/pkg/client"
 	"github.com/JrMarcco/jotify/internal/pkg/registry"
 	"google.golang.org/grpc/attributes"
 	"google.golang.org/grpc/resolver"
@@ -72,10 +73,10 @@ func (r *GrpcResolver) resolve() {
 		addrs = append(addrs, resolver.Address{
 			Addr:       instance.Addr,
 			ServerName: instance.Name,
-			Attributes: attributes.New(attrReadWeight, instance.ReadWeight).
-				WithValue(attrWriteWeight, instance.WriteWeight).
-				WithValue(attrGroup, instance.Group).
-				WithValue(attrNode, instance.Name),
+			Attributes: attributes.New(client.AttrReadWeight, instance.ReadWeight).
+				WithValue(client.AttrWriteWeight, instance.WriteWeight).
+				WithValue(client.AttrGroup, instance.Group).
+				WithValue(client.AttrNode, instance.Name),
 		})
 	}
 

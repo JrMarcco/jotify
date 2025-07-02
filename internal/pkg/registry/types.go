@@ -22,13 +22,13 @@ type ServiceInstance struct {
 	WriteWeight int
 }
 
-type EventType int
+type EventType uint8
 
 //goland:noinspection GoUnusedConst
 const (
 	EventTypeUnknown EventType = iota
 	EventTypePut
-	EventTypeDelete
+	EventTypeDel
 )
 
 type Event struct {
@@ -41,5 +41,5 @@ func (e Event) IsPut() bool {
 }
 
 func (e Event) IsDelete() bool {
-	return e.Type == EventTypeDelete
+	return e.Type == EventTypeDel
 }

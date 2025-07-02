@@ -2,6 +2,7 @@ package ioc
 
 import (
 	"github.com/JrMarcco/jotify/internal/pkg/registry"
+	"github.com/JrMarcco/jotify/internal/pkg/registry/etcd"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.uber.org/fx"
 )
@@ -13,8 +14,8 @@ var RegistryFxOpt = fx.Provide(
 	),
 )
 
-func InitRegistry(client *clientv3.Client) *registry.EtcdRegistry {
-	r, err := registry.NewEtcdRegistry(client)
+func InitRegistry(client *clientv3.Client) *etcd.Registry {
+	r, err := etcd.NewRegistry(client)
 	if err != nil {
 		panic(err)
 	}

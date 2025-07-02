@@ -1,4 +1,4 @@
-package client
+package balancer
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/JrMarcco/easy-kit/slice"
+	"github.com/JrMarcco/jotify/internal/pkg/client"
 	"google.golang.org/grpc/balancer"
 	"google.golang.org/grpc/balancer/base"
 )
@@ -26,19 +27,19 @@ func (b *RwWeightBalancerBuilder) Build(info base.PickerBuildInfo) balancer.Pick
 	defer b.mu.Unlock()
 
 	for cc, ccInfo := range info.ReadySCs {
-		readWeight, ok := ccInfo.Address.Attributes.Value(attrReadWeight).(int32)
+		readWeight, ok := ccInfo.Address.Attributes.Value(client.AttrReadWeight).(int32)
 		if !ok {
 			continue
 		}
-		writeWeight, ok := ccInfo.Address.Attributes.Value(attrWriteWeight).(int32)
+		writeWeight, ok := ccInfo.Address.Attributes.Value(client.AttrWriteWeight).(int32)
 		if !ok {
 			continue
 		}
-		groupName, ok := ccInfo.Address.Attributes.Value(attrGroup).(string)
+		groupName, ok := ccInfo.Address.Attributes.Value(client.AttrGroup).(string)
 		if !ok {
 			continue
 		}
-		nodeName, ok := ccInfo.Address.Attributes.Value(attrNode).(string)
+		nodeName, ok := ccInfo.Address.Attributes.Value(client.AttrNode).(string)
 		if !ok {
 			continue
 		}
@@ -80,7 +81,7 @@ func NewRwWeightBalancerBuilder() *RwWeightBalancerBuilder {
 }
 
 func WithGroup(ctx context.Context, group string) context.Context {
-	return context.WithValue(ctx, groupContextKey{}, group)
+	return context.WithValue(ctx, client.ContextKeyGroup{}, group)
 }
 
 var _ balancer.Picker = (*RwReadWeightBalancer)(nil)
@@ -179,7 +180,7 @@ func (p *RwReadWeightBalancer) Pick(info balancer.PickInfo) (balancer.PickResult
 }
 
 func (p *RwReadWeightBalancer) getGroup(ctx context.Context) string {
-	val := ctx.Value(attrGroup)
+	val := ctx.Value(client.ContextKeyGroup{})
 	if val == nil {
 		return ""
 	}
@@ -191,7 +192,7 @@ func (p *RwReadWeightBalancer) getGroup(ctx context.Context) string {
 }
 
 func (p *RwReadWeightBalancer) isWriteReq(ctx context.Context) bool {
-	val := ctx.Value(KeyRequestType)
+	val := ctx.Value(client.ContextKeyReqType{})
 	if val == nil {
 		return false
 	}

@@ -11,7 +11,8 @@ import (
 	notificationv1 "github.com/JrMarcco/jotify-api/api/notification/v1"
 	grpcapi "github.com/JrMarcco/jotify/internal/api/grpc"
 	"github.com/JrMarcco/jotify/internal/api/grpc/interceptor/jwt"
-	clientpkg "github.com/JrMarcco/jotify/internal/pkg/client"
+	balancer2 "github.com/JrMarcco/jotify/internal/pkg/client/balancer"
+	clientpkg "github.com/JrMarcco/jotify/internal/pkg/client/resolver"
 	grpcpkg "github.com/JrMarcco/jotify/internal/pkg/grpc"
 	"github.com/JrMarcco/jotify/internal/pkg/registry"
 	"github.com/spf13/viper"
@@ -107,7 +108,7 @@ func InitCallbackGrpcClients(r registry.Registry) *grpcpkg.Clients[clientv1.Call
 	// 创建负载均衡 builder
 	bb := base.NewBalancerBuilder(
 		cfg.Name,
-		clientpkg.NewRwWeightBalancerBuilder(),
+		balancer2.NewRwWeightBalancerBuilder(),
 		base.Config{HealthCheck: true},
 	)
 	// 注册负载均衡 builder

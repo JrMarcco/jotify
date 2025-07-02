@@ -1,8 +1,9 @@
-package client
+package balancer
 
 import (
 	"sync"
 
+	"github.com/JrMarcco/jotify/internal/pkg/client"
 	"google.golang.org/grpc/balancer"
 	"google.golang.org/grpc/balancer/base"
 )
@@ -16,7 +17,7 @@ func (b *WeightBalancerBuilder) Build(info base.PickerBuildInfo) balancer.Picker
 	totalWeight := int32(0)
 
 	for cc, ccInfo := range info.ReadySCs {
-		weight, _ := ccInfo.Address.Attributes.Value(attrWeight).(int32)
+		weight, _ := ccInfo.Address.Attributes.Value(client.AttrWeight).(int32)
 		totalWeight += weight
 
 		nodes = append(nodes, &weightServiceNode{

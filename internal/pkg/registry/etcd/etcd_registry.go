@@ -32,17 +32,13 @@ func (r *Registry) Register(ctx context.Context, si registry.ServiceInstance) er
 	if err != nil {
 		return err
 	}
-	_, err = r.etcdClient.Put(ctx, r.siKey(si), string(val), clientv3.WithLease(r.etcdSession.Lease()))
+	_, err = r.etcdClient.Put(ctx, r.instanceKey(si), string(val), clientv3.WithLease(r.etcdSession.Lease()))
 	return err
 }
 
 func (r *Registry) Unregister(ctx context.Context, si registry.ServiceInstance) error {
-	_, err := r.etcdClient.Delete(ctx, r.siKey(si))
+	_, err := r.etcdClient.Delete(ctx, r.instanceKey(si))
 	return err
-}
-
-func (r *Registry) siKey(si registry.ServiceInstance) string {
-	return fmt.Sprintf("/notification/%s/%s", si.Name, si.Addr)
 }
 
 func (r *Registry) ListService(ctx context.Context, serviceName string) ([]registry.ServiceInstance, error) {
@@ -101,6 +97,10 @@ func (r *Registry) Subscribe(serviceName string) <-chan registry.Event {
 
 func (r *Registry) serviceKey(serviceName string) string {
 	return fmt.Sprintf("/notification/%s", serviceName)
+}
+
+func (r *Registry) instanceKey(si registry.ServiceInstance) string {
+	return fmt.Sprintf("/notification/%s/%s", si.Name, si.Addr)
 }
 
 func (r *Registry) Close() error {

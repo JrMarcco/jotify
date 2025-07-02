@@ -50,6 +50,7 @@ func (c *Clients[T]) dial(serviceName string) (*grpc.ClientConn, error) {
 			fmt.Sprintf(`{"loadBalancingPolicy: %q"}`, c.bb.Name()),
 		))
 	}
+	// "registry:///%s" 的 registry 对应 grpc resolver 的 scheme
 	addr := fmt.Sprintf("registry:///%s", serviceName)
 	return grpc.NewClient(addr, opts...)
 }

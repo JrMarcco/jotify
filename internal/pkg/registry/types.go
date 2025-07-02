@@ -24,6 +24,7 @@ type ServiceInstance struct {
 
 type EventType int
 
+//goland:noinspection GoUnusedConst
 const (
 	EventTypeUnknown EventType = iota
 	EventTypePut

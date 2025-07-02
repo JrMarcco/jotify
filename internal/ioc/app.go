@@ -66,14 +66,14 @@ func AppLifecycle(lc fx.Lifecycle, app *App) {
 		OnStart: func(ctx context.Context) error {
 			si := app.si
 
-			lis, err := net.Listen("tcp", si.Addr)
+			ln, err := net.Listen("tcp", si.Addr)
 			if err != nil {
 				return err
 			}
 
 			// 启动 gRPC 服务器
 			go func() {
-				if serveErr := app.grpcServer.Serve(lis); err != nil {
+				if serveErr := app.grpcServer.Serve(ln); err != nil {
 					panic(serveErr)
 				}
 			}()

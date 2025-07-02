@@ -31,9 +31,7 @@ type App struct {
 }
 
 func (app *App) Start() error {
-	si := app.serviceInstance
-
-	ln, err := net.Listen("tcp", si.Addr)
+	ln, err := net.Listen("tcp", app.serviceInstance.Addr)
 	if err != nil {
 		return err
 	}
@@ -48,7 +46,7 @@ func (app *App) Start() error {
 	// 注册服务到注册中心
 	if app.registry != nil {
 		registerCtx, cancel := context.WithTimeout(context.Background(), app.timeout)
-		regErr := app.registry.Register(registerCtx, si)
+		regErr := app.registry.Register(registerCtx, app.serviceInstance)
 		cancel()
 
 		if regErr != nil {

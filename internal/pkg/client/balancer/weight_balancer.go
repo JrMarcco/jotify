@@ -40,13 +40,13 @@ type WeightBalancer struct {
 	totalWeight int32
 }
 
-func (b *WeightBalancer) Pick(_ balancer.PickInfo) (balancer.PickResult, error) {
-	if len(b.nodes) == 0 {
+func (p *WeightBalancer) Pick(_ balancer.PickInfo) (balancer.PickResult, error) {
+	if len(p.nodes) == 0 {
 		return balancer.PickResult{}, balancer.ErrNoSubConnAvailable
 	}
 
 	var selectedNode *weightServiceNode
-	for _, node := range b.nodes {
+	for _, node := range p.nodes {
 		node.mu.Lock()
 		node.currentWeight = node.currentWeight + node.weight
 

@@ -39,14 +39,14 @@ type DynamicWeightBalancer struct {
 	nodes []*dynamicServiceNode
 }
 
-func (b *DynamicWeightBalancer) Pick(_ balancer.PickInfo) (balancer.PickResult, error) {
-	if len(b.nodes) == 0 {
+func (p *DynamicWeightBalancer) Pick(_ balancer.PickInfo) (balancer.PickResult, error) {
+	if len(p.nodes) == 0 {
 		return balancer.PickResult{}, balancer.ErrNoSubConnAvailable
 	}
 
 	var totalWeight int32
 	var selectedNode *dynamicServiceNode
-	for _, node := range b.nodes {
+	for _, node := range p.nodes {
 		node.mu.RLock()
 		totalWeight += node.efficientWeight
 		node.currentWeight += node.efficientWeight

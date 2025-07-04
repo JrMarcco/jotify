@@ -15,7 +15,7 @@ var RegistryFxOpt = fx.Provide(
 )
 
 func InitRegistry(client *clientv3.Client) *etcd.Registry {
-	r, err := etcd.NewRegistry(client)
+	r, err := etcd.NewRegistryBuilder(client).LeaseTTL(15).Build()
 	if err != nil {
 		panic(err)
 	}

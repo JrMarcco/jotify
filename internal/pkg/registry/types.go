@@ -9,7 +9,7 @@ type Registry interface {
 	Register(ctx context.Context, si ServiceInstance) error
 	Unregister(ctx context.Context, si ServiceInstance) error
 	ListService(ctx context.Context, serviceName string) ([]ServiceInstance, error)
-	Subscribe(serviceName string) <-chan Event
+	Subscribe(serviceName string) <-chan struct{}
 
 	io.Closer
 }
@@ -20,26 +20,4 @@ type ServiceInstance struct {
 	Group       string
 	ReadWeight  int
 	WriteWeight int
-}
-
-type EventType uint8
-
-//goland:noinspection GoUnusedConst
-const (
-	EventTypeUnknown EventType = iota
-	EventTypePut
-	EventTypeDel
-)
-
-type Event struct {
-	Type            EventType
-	ServiceInstance ServiceInstance
-}
-
-func (e Event) IsPut() bool {
-	return e.Type == EventTypePut
-}
-
-func (e Event) IsDelete() bool {
-	return e.Type == EventTypeDel
 }

@@ -7,15 +7,9 @@ import (
 	"sync"
 
 	"github.com/JrMarcco/jotify/internal/pkg/registry"
-	"go.etcd.io/etcd/api/v3/mvccpb"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.etcd.io/etcd/client/v3/concurrency"
 )
-
-var typeMap = map[mvccpb.Event_EventType]registry.EventType{
-	mvccpb.PUT:    registry.EventTypePut,
-	mvccpb.DELETE: registry.EventTypeDel,
-}
 
 var _ registry.Registry = (*Registry)(nil)
 
@@ -24,6 +18,7 @@ type Registry struct {
 
 	etcdClient  *clientv3.Client
 	etcdSession *concurrency.Session
+
 	watchCancel []context.CancelFunc
 }
 
@@ -58,7 +53,7 @@ func (r *Registry) ListService(ctx context.Context, serviceName string) ([]regis
 	return res, nil
 }
 
-func (r *Registry) Subscribe(serviceName string) <-chan registry.Event {
+func (r *Registry) Subscribe(serviceName string) <-chan struct{} {
 	ctx, cancel := context.WithCancel(context.Background())
 	ctx = clientv3.WithRequireLeader(ctx)
 
@@ -66,33 +61,27 @@ func (r *Registry) Subscribe(serviceName string) <-chan registry.Event {
 	r.watchCancel = append(r.watchCancel, cancel)
 	r.mu.Unlock()
 
-	ch := r.etcdClient.Watch(ctx, r.serviceKey(serviceName), clientv3.WithPrefix())
-	res := make(chan registry.Event)
+	watchChan := r.etcdClient.Watch(ctx, r.serviceKey(serviceName), clientv3.WithPrefix())
 
+	ch := make(chan struct{})
 	go func() {
 		for {
 			select {
 			case <-ctx.Done():
 				return
-			case resp := <-ch:
+			case resp := <-watchChan:
+				if resp.Err() != nil {
+					continue
+				}
 				if resp.Canceled {
 					return
 				}
 
-				if resp.Err() != nil {
-					continue
-				}
-
-				for _, e := range resp.Events {
-					// 事件类型转换：mvccpb.Event_EventType -> registry.EventType
-					res <- registry.Event{
-						Type: typeMap[e.Type],
-					}
-				}
+				ch <- struct{}{}
 			}
 		}
 	}()
-	return res
+	return ch
 }
 
 func (r *Registry) serviceKey(serviceName string) string {
@@ -105,11 +94,11 @@ func (r *Registry) instanceKey(si registry.ServiceInstance) string {
 
 func (r *Registry) Close() error {
 	r.mu.Lock()
-	defer r.mu.Unlock()
-
 	for _, cancel := range r.watchCancel {
 		cancel()
 	}
+	r.mu.Unlock()
+
 	return r.etcdSession.Close()
 }
 

@@ -23,7 +23,7 @@ func (b *GrpcResolverBuilder) Build(target resolver.Target, cc resolver.ClientCo
 		timeout:  b.timeout,
 		target:   target,
 		cc:       cc,
-		close:    make(chan struct{}),
+		ch:       make(chan struct{}),
 	}
 
 	r.resolve()
@@ -51,7 +51,7 @@ type GrpcResolver struct {
 	target resolver.Target
 	cc     resolver.ClientConn
 
-	close chan struct{}
+	ch chan struct{} // 用来控制 watch 方法退出
 }
 
 func (r *GrpcResolver) ResolveNow(_ resolver.ResolveNowOptions) {
@@ -59,13 +59,13 @@ func (r *GrpcResolver) ResolveNow(_ resolver.ResolveNowOptions) {
 }
 
 func (r *GrpcResolver) resolve() {
-	serviceName := r.target.Endpoint()
 	ctx, cancel := context.WithTimeout(context.Background(), r.timeout)
-	instances, err := r.registry.ListService(ctx, serviceName)
+	instances, err := r.registry.ListService(ctx, r.target.Endpoint())
 	cancel()
 
 	if err != nil {
 		r.cc.ReportError(err)
+		return
 	}
 
 	addrs := make([]resolver.Address, 0, len(instances))
@@ -83,11 +83,12 @@ func (r *GrpcResolver) resolve() {
 	err = r.cc.UpdateState(resolver.State{Addresses: addrs})
 	if err != nil {
 		r.cc.ReportError(err)
+		return
 	}
 }
 
 func (r *GrpcResolver) Close() {
-	r.close <- struct{}{}
+	close(r.ch)
 }
 
 func (r *GrpcResolver) watch() {
@@ -97,7 +98,7 @@ func (r *GrpcResolver) watch() {
 		select {
 		case <-events:
 			r.resolve()
-		case <-r.close:
+		case <-r.ch:
 			return
 		}
 	}

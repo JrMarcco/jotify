@@ -39,6 +39,9 @@ func (p *RoundRobinBalancer) Pick(_ balancer.PickInfo) (balancer.PickResult, err
 		return balancer.PickResult{}, balancer.ErrNoSubConnAvailable
 	}
 	index := atomic.AddUint64(&p.index, 1)
+
+	// index - 1 是为了从 0 开始。
+	// 这里做不做 -1 没有什么实质性影响，不 -1 也只是第一个节点少参与一次轮询
 	cc := p.ccs[(index-1)%p.length]
 	return balancer.PickResult{
 		SubConn: cc,

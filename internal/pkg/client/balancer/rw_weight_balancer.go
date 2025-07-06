@@ -27,11 +27,11 @@ func (b *RwWeightBalancerBuilder) Build(info base.PickerBuildInfo) balancer.Pick
 	defer b.mu.Unlock()
 
 	for cc, ccInfo := range info.ReadySCs {
-		readWeight, ok := ccInfo.Address.Attributes.Value(client.AttrReadWeight).(int32)
+		readWeight, ok := ccInfo.Address.Attributes.Value(client.AttrReadWeight).(uint32)
 		if !ok {
 			continue
 		}
-		writeWeight, ok := ccInfo.Address.Attributes.Value(client.AttrWriteWeight).(int32)
+		writeWeight, ok := ccInfo.Address.Attributes.Value(client.AttrWriteWeight).(uint32)
 		if !ok {
 			continue
 		}
@@ -71,7 +71,7 @@ func (b *RwWeightBalancerBuilder) Build(info base.PickerBuildInfo) balancer.Pick
 		}
 	}
 
-	return &RwReadWeightBalancer{nodes: nodes}
+	return &RwWeightBalancer{nodes: nodes}
 }
 
 func NewRwWeightBalancerBuilder() *RwWeightBalancerBuilder {
@@ -80,17 +80,13 @@ func NewRwWeightBalancerBuilder() *RwWeightBalancerBuilder {
 	}
 }
 
-func WithGroup(ctx context.Context, group string) context.Context {
-	return context.WithValue(ctx, client.ContextKeyGroup{}, group)
-}
+var _ balancer.Picker = (*RwWeightBalancer)(nil)
 
-var _ balancer.Picker = (*RwReadWeightBalancer)(nil)
-
-type RwReadWeightBalancer struct {
+type RwWeightBalancer struct {
 	nodes []*rwWeightServiceNode
 }
 
-func (p *RwReadWeightBalancer) Pick(info balancer.PickInfo) (balancer.PickResult, error) {
+func (p *RwWeightBalancer) Pick(info balancer.PickInfo) (balancer.PickResult, error) {
 	if len(p.nodes) == 0 {
 		return balancer.PickResult{}, balancer.ErrNoSubConnAvailable
 	}
@@ -108,7 +104,7 @@ func (p *RwReadWeightBalancer) Pick(info balancer.PickInfo) (balancer.PickResult
 		return balancer.PickResult{}, balancer.ErrNoSubConnAvailable
 	}
 
-	var totalWeight int32
+	var totalWeight uint32
 	var selectedNode *rwWeightServiceNode
 
 	isWriteReq := p.isWriteReq(ctx)
@@ -179,7 +175,7 @@ func (p *RwReadWeightBalancer) Pick(info balancer.PickInfo) (balancer.PickResult
 	}, nil
 }
 
-func (p *RwReadWeightBalancer) getGroup(ctx context.Context) string {
+func (p *RwWeightBalancer) getGroup(ctx context.Context) string {
 	val := ctx.Value(client.ContextKeyGroup{})
 	if val == nil {
 		return ""
@@ -191,13 +187,13 @@ func (p *RwReadWeightBalancer) getGroup(ctx context.Context) string {
 	return ""
 }
 
-func (p *RwReadWeightBalancer) isWriteReq(ctx context.Context) bool {
+func (p *RwWeightBalancer) isWriteReq(ctx context.Context) bool {
 	val := ctx.Value(client.ContextKeyReqType{})
 	if val == nil {
 		return false
 	}
 
-	if intVal, ok := val.(int); ok {
+	if intVal, ok := val.(uint8); ok {
 		return intVal == 1
 	}
 	return false
@@ -207,18 +203,18 @@ type rwWeightServiceNode struct {
 	mu sync.RWMutex
 
 	cc                  balancer.SubConn
-	readWeight          int32
-	currentReadWeight   int32
-	efficientReadWeight int32
+	readWeight          uint32
+	currentReadWeight   uint32
+	efficientReadWeight uint32
 
-	writeWeight          int32
-	currentWriteWeight   int32
-	efficientWriteWeight int32
+	writeWeight          uint32
+	currentWriteWeight   uint32
+	efficientWriteWeight uint32
 
 	group string
 }
 
-func newRwWeightServiceNode(cc balancer.SubConn, readWeight int32, writeWeight int32, group string) *rwWeightServiceNode {
+func newRwWeightServiceNode(cc balancer.SubConn, readWeight uint32, writeWeight uint32, group string) *rwWeightServiceNode {
 	return &rwWeightServiceNode{
 		cc:                   cc,
 		readWeight:           readWeight,

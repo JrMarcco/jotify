@@ -21,7 +21,7 @@ func (b *DynamicWeightBalancerBuilder) Build(info base.PickerBuildInfo) balancer
 	nodes := make([]*dynamicServiceNode, 0, len(info.ReadySCs))
 
 	for cc, ccInfo := range info.ReadySCs {
-		weight, _ := ccInfo.Address.Attributes.Value(client.AttrWeight).(int32)
+		weight, _ := ccInfo.Address.Attributes.Value(client.AttrWeight).(uint32)
 		nodes = append(nodes, &dynamicServiceNode{
 			cc:              cc,
 			weight:          weight,
@@ -44,7 +44,7 @@ func (p *DynamicWeightBalancer) Pick(_ balancer.PickInfo) (balancer.PickResult, 
 		return balancer.PickResult{}, balancer.ErrNoSubConnAvailable
 	}
 
-	var totalWeight int32
+	var totalWeight uint32
 	var selectedNode *dynamicServiceNode
 	for _, node := range p.nodes {
 		node.mu.RLock()
@@ -102,7 +102,7 @@ type dynamicServiceNode struct {
 	mu sync.RWMutex
 
 	cc              balancer.SubConn
-	weight          int32
-	currentWeight   int32
-	efficientWeight int32
+	weight          uint32
+	currentWeight   uint32
+	efficientWeight uint32
 }

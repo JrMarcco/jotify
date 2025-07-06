@@ -1,6 +1,9 @@
 package balancer
 
 import (
+	"context"
+	"errors"
+	"io"
 	"sync"
 
 	"github.com/JrMarcco/jotify/internal/pkg/client"
@@ -12,14 +15,11 @@ var _ base.PickerBuilder = (*WeightBalancerBuilder)(nil)
 
 type WeightBalancerBuilder struct{}
 
-func (b *WeightBalancerBuilder) Build(info base.PickerBuildInfo) balancer.Picker {
+func (w *WeightBalancerBuilder) Build(info base.PickerBuildInfo) balancer.Picker {
 	nodes := make([]*weightServiceNode, 0, len(info.ReadySCs))
-	totalWeight := int32(0)
 
 	for cc, ccInfo := range info.ReadySCs {
-		weight, _ := ccInfo.Address.Attributes.Value(client.AttrWeight).(int32)
-		totalWeight += weight
-
+		weight, _ := ccInfo.Address.Attributes.Value(client.AttrWeight).(uint32)
 		nodes = append(nodes, &weightServiceNode{
 			cc:            cc,
 			weight:        weight,
@@ -28,32 +28,32 @@ func (b *WeightBalancerBuilder) Build(info base.PickerBuildInfo) balancer.Picker
 	}
 
 	return &WeightBalancer{
-		nodes:       nodes,
-		totalWeight: totalWeight,
+		nodes: nodes,
 	}
 }
 
 var _ balancer.Picker = (*WeightBalancer)(nil)
 
 type WeightBalancer struct {
-	nodes       []*weightServiceNode
-	totalWeight int32
+	nodes []*weightServiceNode
 }
 
-func (p *WeightBalancer) Pick(_ balancer.PickInfo) (balancer.PickResult, error) {
-	if len(p.nodes) == 0 {
+func (w *WeightBalancer) Pick(_ balancer.PickInfo) (balancer.PickResult, error) {
+	if len(w.nodes) == 0 {
 		return balancer.PickResult{}, balancer.ErrNoSubConnAvailable
 	}
 
+	var totalWeight uint32
 	var selectedNode *weightServiceNode
-	for _, node := range p.nodes {
+
+	for _, node := range w.nodes {
 		node.mu.Lock()
-		node.currentWeight = node.currentWeight + node.weight
+		totalWeight += node.efficientWeight
+		node.currentWeight += node.efficientWeight
 
 		if selectedNode == nil || selectedNode.currentWeight < node.currentWeight {
 			selectedNode = node
 		}
-
 		node.mu.Unlock()
 	}
 
@@ -62,19 +62,36 @@ func (p *WeightBalancer) Pick(_ balancer.PickInfo) (balancer.PickResult, error) 
 	}
 
 	selectedNode.mu.Lock()
-	selectedNode.currentWeight -= selectedNode.weight
+	selectedNode.currentWeight -= totalWeight
 	selectedNode.mu.Unlock()
 
 	return balancer.PickResult{
 		SubConn: selectedNode.cc,
-		Done:    func(_ balancer.DoneInfo) {},
+		Done: func(info balancer.DoneInfo) {
+			selectedNode.mu.Lock()
+			defer selectedNode.mu.Unlock()
+
+			const twice = 2
+			if info.Err == nil {
+				selectedNode.efficientWeight++
+				selectedNode.efficientWeight = max(selectedNode.efficientWeight, selectedNode.weight*twice)
+				return
+			}
+
+			if errors.Is(info.Err, context.DeadlineExceeded) || errors.Is(info.Err, io.EOF) {
+				if selectedNode.efficientWeight > 1 {
+					selectedNode.efficientWeight--
+				}
+			}
+		},
 	}, nil
 }
 
 type weightServiceNode struct {
 	mu sync.RWMutex
 
-	cc            balancer.SubConn
-	weight        int32
-	currentWeight int32
+	cc              balancer.SubConn
+	weight          uint32
+	currentWeight   uint32
+	efficientWeight uint32
 }

@@ -20,7 +20,7 @@ func (b *RoundRobinBalancerBuilder) Build(info base.PickerBuildInfo) balancer.Pi
 
 	return &RoundRobinBalancer{
 		ccs:    ccs,
-		index:  -1,
+		index:  0,
 		length: uint64(len(ccs)),
 	}
 }
@@ -39,7 +39,7 @@ func (p *RoundRobinBalancer) Pick(_ balancer.PickInfo) (balancer.PickResult, err
 		return balancer.PickResult{}, balancer.ErrNoSubConnAvailable
 	}
 	index := atomic.AddUint64(&p.index, 1)
-	cc := p.ccs[index%p.length]
+	cc := p.ccs[(index-1)%p.length]
 	return balancer.PickResult{
 		SubConn: cc,
 		Done:    func(_ balancer.DoneInfo) {},

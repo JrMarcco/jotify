@@ -77,9 +77,9 @@ func (p *CHBalancer) addNode(cc balancer.SubConn, addr string) {
 	//
 	// 假设有 3 个物理节点：
 	// 哈希后可能分布在环上的位置：
-	// s1: hash=100
-	// s2: hash=200
-	// s3: hash=300
+	// 		s1: hash=100
+	// 		s2: hash=200
+	// 		s3: hash=300
 	// 在为每个物理节点创建 100 个虚拟节点后：
 	// 使用虚拟节点的哈希环：
 	// 0 - s1 - s2 - s3 - s1 - s2 - s3 - s1 - s2 - s3 - ... - s1 - s2 - 1000

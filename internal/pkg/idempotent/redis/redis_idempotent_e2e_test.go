@@ -1,6 +1,6 @@
 //go:build e2e
 
-package idempotent
+package redis
 
 import (
 	"fmt"

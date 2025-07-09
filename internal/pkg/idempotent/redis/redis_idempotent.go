@@ -1,21 +1,22 @@
-package idempotent
+package redis
 
 import (
 	"context"
 	"time"
 
+	"github.com/JrMarcco/jotify/internal/pkg/idempotent"
 	"github.com/redis/go-redis/v9"
 )
 
-var _ Strategy = (*RedisStrategy)(nil)
+var _ idempotent.Strategy = (*Strategy)(nil)
 
-// RedisStrategy 幂等策略的 redis 实现
-type RedisStrategy struct {
+// Strategy 幂等策略的 redis 实现
+type Strategy struct {
 	client  redis.Cmdable
 	expires time.Duration
 }
 
-func (r *RedisStrategy) Exists(ctx context.Context, key string) (bool, error) {
+func (r *Strategy) Exists(ctx context.Context, key string) (bool, error) {
 	res, err := r.client.SetNX(ctx, r.redisKey(key), 1, r.expires).Result()
 	if err != nil {
 		return false, err
@@ -23,7 +24,7 @@ func (r *RedisStrategy) Exists(ctx context.Context, key string) (bool, error) {
 	return !res, nil
 }
 
-func (r *RedisStrategy) MultiExists(ctx context.Context, keys []string) (map[string]bool, error) {
+func (r *Strategy) MultiExists(ctx context.Context, keys []string) (map[string]bool, error) {
 	pipeline := r.client.Pipeline()
 	commands := make([]*redis.BoolCmd, len(keys))
 
@@ -47,12 +48,12 @@ func (r *RedisStrategy) MultiExists(ctx context.Context, keys []string) (map[str
 	return res, nil
 }
 
-func (r *RedisStrategy) redisKey(bizKey string) string {
+func (r *Strategy) redisKey(bizKey string) string {
 	return "idempotent:" + bizKey
 }
 
-func NewRedisStrategy(client redis.Cmdable, expires time.Duration) *RedisStrategy {
-	return &RedisStrategy{
+func NewStrategy(client redis.Cmdable, expires time.Duration) *Strategy {
+	return &Strategy{
 		client:  client,
 		expires: expires,
 	}

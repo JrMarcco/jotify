@@ -14,12 +14,13 @@ const (
 
 )
 
+// BitRing 一个使用比特环记录事件的华东窗口
 type BitRing struct {
 	mu sync.RWMutex
 
 	words []uint64 // 存放事件状态的比特环
 
-	windowSize int
+	windowSize int // 窗口大小
 	writePos   int // 下一个事件状态写入位置
 
 	isFull               bool

@@ -1,173 +1,206 @@
 package balancer
 
 import (
-	"crypto/md5"
-	"encoding/binary"
+	"context"
 	"fmt"
 	"sort"
 	"sync"
 
+	"github.com/JrMarcco/jotify/internal/pkg/client"
+	"github.com/JrMarcco/jotify/internal/pkg/snowflake"
+	"github.com/cespare/xxhash/v2"
 	"google.golang.org/grpc/balancer"
 	"google.golang.org/grpc/balancer/base"
 )
 
-var _ base.PickerBuilder = (*ConsistentHashBalancerBuilder)(nil)
+var _ base.PickerBuilder = (*CHBalancerBuilder)(nil)
 
-type ConsistentHashBalancerBuilder struct{}
+type CHBalancerBuilder struct {
+	virtualNodeCnt int // 虚拟节点数量
+}
 
-func (b *ConsistentHashBalancerBuilder) Build(info base.PickerBuildInfo) balancer.Picker {
+func (b *CHBalancerBuilder) VirtualNodeCnt(cnt int) {
+	b.virtualNodeCnt = cnt
+}
+
+func (b *CHBalancerBuilder) Build(info base.PickerBuildInfo) balancer.Picker {
 	if len(info.ReadySCs) == 0 {
-		return &ConsistentHashBalancer{}
+		return base.NewErrPicker(balancer.ErrNoSubConnAvailable)
 	}
 
-	hashRing := NewHashRing()
+	if b.virtualNodeCnt <= 0 {
+		return base.NewErrPicker(fmt.Errorf("[jotify] virtual node count must be greater than 0"))
+	}
 
-	// 为每个连接添加虚拟节点
+	ccs := make(map[string]balancer.SubConn, len(info.ReadySCs))
+	ring := make([]uint32, 0, b.virtualNodeCnt*len(info.ReadySCs))
+	nodes := make([]string, 0, b.virtualNodeCnt*len(info.ReadySCs))
+	p := &CHBalancer{
+		ccs:            ccs,
+		ring:           ring,
+		nodes:          nodes,
+		virtualNodeCnt: b.virtualNodeCnt,
+	}
+
 	for cc, ccInfo := range info.ReadySCs {
-		// 使用连接的地址作为节点标识
-		nodeID := ccInfo.Address.Addr
-		hashRing.AddNode(nodeID, cc)
+		p.addNode(cc, ccInfo.Address.Addr)
 	}
 
-	return &ConsistentHashBalancer{
-		hashRing: hashRing,
+	return p
+}
+
+func NewCHBalancerBuilder() *CHBalancerBuilder {
+	return &CHBalancerBuilder{
+		virtualNodeCnt: 100,
 	}
 }
 
-var _ balancer.Picker = (*ConsistentHashBalancer)(nil)
+var _ balancer.Picker = (*CHBalancer)(nil)
 
-type ConsistentHashBalancer struct {
-	hashRing *HashRing
+type CHBalancer struct {
+	mu sync.RWMutex
+
+	ccs            map[string]balancer.SubConn // 虚拟节点地址 -> SubConn
+	ring           []uint32                    // 哈希环，存储虚拟节点的哈希值
+	nodes          []string                    // 与哈希环对应的虚拟节点地址
+	virtualNodeCnt int                         // 虚拟节点数量
 }
 
-func (p *ConsistentHashBalancer) Pick(info balancer.PickInfo) (balancer.PickResult, error) {
-	if p.hashRing == nil || p.hashRing.IsEmpty() {
+func (p *CHBalancer) addNode(cc balancer.SubConn, addr string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	p.ccs[addr] = cc
+
+	// 为每个物理节点创建多个虚拟节点
+	// 虚拟节点在一致性哈希中起到**关键的负载均衡作用
+	//
+	// 假设有 3 个物理节点：
+	// 哈希后可能分布在环上的位置：
+	// s1: hash=100
+	// s2: hash=200
+	// s3: hash=300
+	// 在为每个物理节点创建 100 个虚拟节点后：
+	// 使用虚拟节点的哈希环：
+	// 0 - s1 - s2 - s3 - s1 - s2 - s3 - s1 - s2 - s3 - ... - s1 - s2 - 1000
+	// 负载分布：s1(33%), s2(33%), s3(34%)
+	for i := 0; i < p.virtualNodeCnt; i++ {
+		hash := p.hash(fmt.Sprintf("%s#%d", addr, i))
+
+		p.ring = append(p.ring, hash)
+		p.nodes = append(p.nodes, addr)
+	}
+
+	p.sortRing()
+}
+
+func (p *CHBalancer) sortRing() {
+	// 索引切片，用于排序
+	indices := make([]int, len(p.ring))
+	for i := range indices {
+		indices[i] = i
+	}
+
+	// 根据哈希值排序索引
+	sort.Slice(indices, func(i, j int) bool {
+		return p.ring[indices[i]] < p.ring[indices[j]]
+	})
+
+	sortedRing := make([]uint32, len(p.ring))
+	sortedNodes := make([]string, len(p.nodes))
+	for i, index := range indices {
+		sortedRing[i] = p.ring[index]
+		sortedNodes[i] = p.nodes[index]
+	}
+
+	p.ring = sortedRing
+	p.nodes = sortedNodes
+}
+
+func (p *CHBalancer) removeNode(addr string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	delete(p.ccs, addr)
+
+	newRing := make([]uint32, 0, len(p.ring)-p.virtualNodeCnt)
+	newNodes := make([]string, 0, len(p.nodes)-p.virtualNodeCnt)
+	for i, node := range p.nodes {
+		if node != addr {
+			newRing = append(newRing, p.ring[i])
+			newNodes = append(newNodes, node)
+		}
+	}
+
+	p.ring = newRing
+	p.nodes = newNodes
+}
+
+func (p *CHBalancer) Pick(info balancer.PickInfo) (balancer.PickResult, error) {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
+	if len(p.ccs) == 0 {
 		return balancer.PickResult{}, balancer.ErrNoSubConnAvailable
 	}
 
-	// 使用 FullMethodName 作为哈希键
-	// 你也可以根据需要使用其他信息，比如客户端 IP、用户 ID 等
-	key := info.FullMethodName
-	if key == "" {
-		key = "default"
+	hashKey, err := p.hashFromContext(info.Ctx)
+	if err != nil {
+		return balancer.PickResult{}, err
 	}
 
-	conn := p.hashRing.GetNode(key)
-	if conn == nil {
+	nodeAddr := p.getNodeAddr(hashKey)
+	if nodeAddr == "" {
 		return balancer.PickResult{}, balancer.ErrNoSubConnAvailable
 	}
 
-	subConn, ok := conn.(balancer.SubConn)
+	cc, ok := p.ccs[nodeAddr]
 	if !ok {
 		return balancer.PickResult{}, balancer.ErrNoSubConnAvailable
 	}
 
 	return balancer.PickResult{
-		SubConn: subConn,
+		SubConn: cc,
 		Done:    func(_ balancer.DoneInfo) {},
 	}, nil
 }
 
-// HashRing 一致性哈希环
-type HashRing struct {
-	mu           sync.RWMutex
-	virtualNodes int            // 每个物理节点的虚拟节点数量
-	keys         []uint32       // 哈希环上的键值，已排序
-	ring         map[uint32]any // 哈希环，键是哈希值，值是连接
-	nodes        map[string]any // 节点映射，键是节点ID，值是连接
-}
+func (p *CHBalancer) getNodeAddr(hash uint32) string {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
 
-// NewHashRing 创建新的哈希环
-func NewHashRing() *HashRing {
-	return &HashRing{
-		virtualNodes: 150, // 每个物理节点150个虚拟节点
-		ring:         make(map[uint32]any),
-		nodes:        make(map[string]any),
-	}
-}
-
-// AddNode 添加节点到哈希环
-func (h *HashRing) AddNode(nodeID string, conn any) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-
-	h.nodes[nodeID] = conn
-
-	// 为这个节点创建虚拟节点
-	for i := 0; i < h.virtualNodes; i++ {
-		virtualKey := fmt.Sprintf("%s#%d", nodeID, i)
-		hash := h.hash(virtualKey)
-		h.ring[hash] = conn
-		h.keys = append(h.keys, hash)
+	if len(p.ring) == 0 {
+		return ""
 	}
 
-	// 排序哈希环的键
-	sort.Slice(h.keys, func(i, j int) bool {
-		return h.keys[i] < h.keys[j]
-	})
-}
-
-// RemoveNode 从哈希环中移除节点
-func (h *HashRing) RemoveNode(nodeID string) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-
-	if _, exists := h.nodes[nodeID]; !exists {
-		return
-	}
-
-	delete(h.nodes, nodeID)
-
-	// 移除虚拟节点
-	for i := 0; i < h.virtualNodes; i++ {
-		virtualKey := fmt.Sprintf("%s#%d", nodeID, i)
-		hash := h.hash(virtualKey)
-		delete(h.ring, hash)
-	}
-
-	// 重建键列表
-	h.keys = h.keys[:0]
-	for hash := range h.ring {
-		h.keys = append(h.keys, hash)
-	}
-	sort.Slice(h.keys, func(i, j int) bool {
-		return h.keys[i] < h.keys[j]
-	})
-}
-
-// GetNode 根据键获取对应的节点
-func (h *HashRing) GetNode(key string) any {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-
-	if len(h.keys) == 0 {
-		return nil
-	}
-
-	hash := h.hash(key)
-
-	// 在哈希环上查找第一个大于等于hash的节点
-	idx := sort.Search(len(h.keys), func(i int) bool {
-		return h.keys[i] >= hash
+	// 查找第一个大于等于当前 hash 值的节点
+	index := sort.Search(len(p.ring), func(i int) bool {
+		return p.ring[i] >= hash
 	})
 
-	// 如果没有找到，则使用第一个节点（环形结构）
-	if idx == len(h.keys) {
-		idx = 0
+	// 没找到则取第一个节点（环结构）
+	if index >= len(p.ring) {
+		index = 0
+	}
+	return p.nodes[index]
+}
+
+func (p *CHBalancer) hashFromContext(ctx context.Context) (uint32, error) {
+	// 获取 bizId
+	bizId, ok := ctx.Value(client.ContextKeyBizId{}).(uint64)
+	if !ok {
+		return 0, fmt.Errorf("[jotify] bizId not found in context")
+	}
+	bizKey, ok := ctx.Value(client.ContextKeyBizKey{}).(string)
+	if !ok {
+		return 0, fmt.Errorf("[jotify] bizKey not found in context")
 	}
 
-	return h.ring[h.keys[idx]]
+	return p.hash(snowflake.HashKey(bizId, bizKey)), nil
 }
 
-// IsEmpty 检查哈希环是否为空
-func (h *HashRing) IsEmpty() bool {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-	return len(h.keys) == 0
-}
-
-// hash 计算字符串的哈希值
-func (h *HashRing) hash(key string) uint32 {
-	md5Hash := md5.Sum([]byte(key))
-	return binary.BigEndian.Uint32(md5Hash[:4])
+// hash 这里取低 32 位就够了
+func (p *CHBalancer) hash(src string) uint32 {
+	hashVal := xxhash.Sum64String(src)
+	return uint32(hashVal)
 }

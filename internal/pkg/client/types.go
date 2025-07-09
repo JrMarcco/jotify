@@ -25,3 +25,15 @@ type ContextKeyReqType struct{}
 func WithReqType(ctx context.Context, reqType uint8) context.Context {
 	return context.WithValue(ctx, ContextKeyReqType{}, reqType)
 }
+
+type ContextKeyBizId struct{}
+
+func WithBizId(ctx context.Context, bizId uint64) context.Context {
+	return context.WithValue(ctx, ContextKeyBizId{}, bizId)
+}
+
+type ContextKeyBizKey struct{}
+
+func WithBizKey(ctx context.Context, bizKey string) context.Context {
+	return context.WithValue(ctx, ContextKeyBizKey{}, bizKey)
+}

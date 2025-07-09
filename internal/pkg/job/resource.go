@@ -33,7 +33,7 @@ func (s *MaxCntResourceSemaphore) Acquire(ctx context.Context) error {
 	return nil
 }
 
-func (s *MaxCntResourceSemaphore) Release(ctx context.Context) error {
+func (s *MaxCntResourceSemaphore) Release(_ context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.currCnt--

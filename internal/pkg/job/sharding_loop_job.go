@@ -11,8 +11,6 @@ import (
 	"go.uber.org/zap"
 )
 
-type bizFunc func(ctx context.Context) error
-
 type ShardingLoopJob struct {
 	baseKey        string
 	retryInterval  time.Duration
@@ -24,7 +22,7 @@ type ShardingLoopJob struct {
 	dclient          dlock.Dclient
 	logger           *zap.Logger
 
-	bizFunc bizFunc
+	bizFunc func(ctx context.Context) error
 }
 
 func (lj *ShardingLoopJob) Run(ctx context.Context) error {
@@ -81,10 +79,10 @@ func (lj *ShardingLoopJob) tableLoop(ctx context.Context, dl dlock.Dlock) {
 		}
 	}()
 
-	err := lj.bizLoop(ctx, dl)
+	bizErr := lj.bizLoop(ctx, dl)
 	// 任务失败可能是 ctx 超时过期，或者是分布式锁续约失败
-	if err != nil {
-		lj.logger.Error("[jotify] biz loop failed", zap.Error(err))
+	if bizErr != nil {
+		lj.logger.Error("[jotify] biz loop failed", zap.Error(bizErr))
 	}
 
 	// 释放分布式锁
@@ -96,20 +94,15 @@ func (lj *ShardingLoopJob) tableLoop(ctx context.Context, dl dlock.Dlock) {
 		lj.logger.Error("[jotify] failed to release distributed lock", zap.Error(unLockErr))
 	}
 
-	err = ctx.Err()
-	if err == nil {
-		return
-	}
-	
+	ctxErr := ctx.Err()
 	switch {
-	case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
-		lj.logger.Info("[jotify] biz loop canceled", zap.Error(err))
+	case errors.Is(ctxErr, context.Canceled), errors.Is(ctxErr, context.DeadlineExceeded):
+		lj.logger.Info("[jotify] biz loop canceled", zap.Error(ctxErr))
 		return
-	default:
+	case bizErr != nil:
 		// 无可挽回的错误
-		lj.logger.Error("[jotify] biz loop failed, wait for retry", zap.Error(err))
+		lj.logger.Error("[jotify] biz loop failed, wait for retry", zap.Error(bizErr))
 		time.Sleep(lj.retryInterval)
-
 	}
 }
 
@@ -148,7 +141,7 @@ func NewShardingLoopJob(
 	shardingStrategy sharding.Strategy,
 	dclient dlock.Dclient,
 	logger *zap.Logger,
-	bizFunc bizFunc) *ShardingLoopJob {
+	bizFunc func(ctx context.Context) error) *ShardingLoopJob {
 	const defaultTimeout = 3 * time.Second
 	return newShardingLoopJob(
 		baseKey, time.Minute, defaultTimeout, resourceSemaphore, shardingStrategy, dclient, logger, bizFunc,

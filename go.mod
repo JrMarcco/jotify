@@ -1,6 +1,6 @@
 module github.com/JrMarcco/jotify
 
-go 1.24.4
+go 1.24.5
 
 require (
 	github.com/JrMarcco/dlock v0.0.1

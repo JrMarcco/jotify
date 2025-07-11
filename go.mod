@@ -13,12 +13,12 @@ require (
 	github.com/spf13/pflag v1.0.6
 	github.com/spf13/viper v1.20.1
 	github.com/stretchr/testify v1.10.0
-	github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/common v1.0.1203
+	github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/common v1.0.1204
 	github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/sms v1.0.1200
-	go.etcd.io/etcd/client/v3 v3.6.1
+	go.etcd.io/etcd/client/v3 v3.6.2
 	go.uber.org/fx v1.24.0
 	go.uber.org/zap v1.27.0
-	golang.org/x/sync v0.15.0
+	golang.org/x/sync v0.16.0
 	google.golang.org/grpc v1.73.0
 	gorm.io/driver/mysql v1.6.0
 	gorm.io/gorm v1.30.0
@@ -45,13 +45,13 @@ require (
 	github.com/spf13/afero v1.14.0 // indirect
 	github.com/spf13/cast v1.9.2 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
-	go.etcd.io/etcd/api/v3 v3.6.1 // indirect
-	go.etcd.io/etcd/client/pkg/v3 v3.6.1 // indirect
+	go.etcd.io/etcd/api/v3 v3.6.2 // indirect
+	go.etcd.io/etcd/client/pkg/v3 v3.6.2 // indirect
 	go.uber.org/dig v1.19.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/net v0.41.0 // indirect
-	golang.org/x/sys v0.33.0 // indirect
-	golang.org/x/text v0.26.0 // indirect
+	golang.org/x/sys v0.34.0 // indirect
+	golang.org/x/text v0.27.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250707201910-8d1bb00bc6a7 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250707201910-8d1bb00bc6a7 // indirect
 	google.golang.org/protobuf v1.36.6 // indirect

@@ -1,8 +1,13 @@
 package ringbuffer
 
 import (
+	"fmt"
 	"sync"
 	"time"
+)
+
+var (
+	ErrInvalidBufferSize = fmt.Errorf("[jotify] buffer size must be greater than zero")
 )
 
 // TimeDurationRingBuffer 一个固定大小、线程安全的 time.Duration 环形 buffer 实现。
@@ -67,13 +72,13 @@ func (rb *TimeDurationRingBuffer) Count() int {
 	return rb.count
 }
 
-func NewTimeDurationRingBuffer(size int) *TimeDurationRingBuffer {
+func NewTimeDurationRingBuffer(size int) (*TimeDurationRingBuffer, error) {
 	if size <= 0 {
-		panic("[jotify] buffer size must be greater than zero")
+		return nil, ErrInvalidBufferSize
 	}
 
 	return &TimeDurationRingBuffer{
 		buffer: make([]time.Duration, size),
 		size:   size,
-	}
+	}, nil
 }

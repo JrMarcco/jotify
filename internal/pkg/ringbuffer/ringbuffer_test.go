@@ -5,44 +5,37 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 )
-
-func TestNewTimeDurationRingBuffer(t *testing.T) {
-	assert.Panics(t, func() {
-		NewTimeDurationRingBuffer(0)
-	})
-
-	assert.Panics(t, func() {
-		NewTimeDurationRingBuffer(-1)
-	})
-
-	assert.NotPanics(t, func() {
-		NewTimeDurationRingBuffer(1)
-	})
-}
 
 func TestTimeDurationRingBuffer_Add(t *testing.T) {
 	t.Parallel()
 
 	tcs := []struct {
-		name      string
-		buffer    *TimeDurationRingBuffer
-		items     []time.Duration
-		wantSize  int
-		wantCount int
-		wantAvg   time.Duration
+		name       string
+		bufferSize int
+		items      []time.Duration
+		wantSize   int
+		wantCount  int
+		wantAvg    time.Duration
+		wantErr    error
 	}{
 		{
-			name:      "empty buffer",
-			buffer:    NewTimeDurationRingBuffer(4),
-			items:     []time.Duration{},
-			wantSize:  4,
-			wantCount: 0,
-			wantAvg:   0,
+			name:       "invalid buffer size",
+			bufferSize: 0,
+			wantErr:    ErrInvalidBufferSize,
 		}, {
-			name:   "with buffer size",
-			buffer: NewTimeDurationRingBuffer(4),
+			name:       "empty buffer",
+			bufferSize: 4,
+			items:      []time.Duration{},
+			wantSize:   4,
+			wantCount:  0,
+			wantAvg:    0,
+			wantErr:    nil,
+		}, {
+			name:       "with buffer size",
+			bufferSize: 4,
 			items: []time.Duration{
 				time.Second,
 				2 * time.Second,
@@ -51,9 +44,10 @@ func TestTimeDurationRingBuffer_Add(t *testing.T) {
 			wantSize:  4,
 			wantCount: 3,
 			wantAvg:   21 * time.Second,
+			wantErr:   nil,
 		}, {
-			name:   "over buffer size",
-			buffer: NewTimeDurationRingBuffer(4),
+			name:       "over buffer size",
+			bufferSize: 4,
 			items: []time.Duration{
 				time.Second,
 				time.Second,
@@ -66,6 +60,7 @@ func TestTimeDurationRingBuffer_Add(t *testing.T) {
 			wantSize:  4,
 			wantCount: 4,
 			wantAvg:   30500 * time.Millisecond,
+			wantErr:   nil,
 		},
 	}
 
@@ -73,13 +68,19 @@ func TestTimeDurationRingBuffer_Add(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			for _, item := range tc.items {
-				tc.buffer.Add(item)
+			buffer, err := NewTimeDurationRingBuffer(tc.bufferSize)
+			assert.Equal(t, tc.wantErr, err)
+			if err != nil {
+				return
 			}
 
-			assert.Equal(t, tc.wantSize, tc.buffer.Size())
-			assert.Equal(t, tc.wantCount, tc.buffer.Count())
-			assert.Equal(t, tc.wantAvg, tc.buffer.Avg())
+			for _, item := range tc.items {
+				buffer.Add(item)
+			}
+
+			assert.Equal(t, tc.wantSize, buffer.Size())
+			assert.Equal(t, tc.wantCount, buffer.Count())
+			assert.Equal(t, tc.wantAvg, buffer.Avg())
 		})
 	}
 }
@@ -87,7 +88,8 @@ func TestTimeDurationRingBuffer_Add(t *testing.T) {
 func TestTimeDurationRingBuffer_Reset(t *testing.T) {
 	t.Parallel()
 
-	buffer := NewTimeDurationRingBuffer(4)
+	buffer, err := NewTimeDurationRingBuffer(4)
+	require.NoError(t, err)
 
 	buffer.Add(time.Second)
 	buffer.Add(2 * time.Second)
@@ -111,7 +113,8 @@ func TestTimeDurationRingBuffer_Reset(t *testing.T) {
 func TestTimeDurationRingBuffer_ThreadSafe(t *testing.T) {
 	t.Parallel()
 
-	buffer := NewTimeDurationRingBuffer(128)
+	buffer, err := NewTimeDurationRingBuffer(128)
+	require.NoError(t, err)
 
 	var eg errgroup.Group
 	for i := 0; i < 128; i++ {

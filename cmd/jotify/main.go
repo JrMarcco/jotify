@@ -32,6 +32,9 @@ func main() {
 		// 初始化 Service
 		ioc.ServiceFxOpt,
 
+		// 初始化 Scheduler
+		ioc.SchedulerFxOpt,
+
 		// 初始化注册中心
 		ioc.RegistryFxOpt,
 		// 初始化 grpc.Server

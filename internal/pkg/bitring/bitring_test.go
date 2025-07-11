@@ -87,7 +87,7 @@ func TestBitRing_ShouldTrigger(t *testing.T) {
 			for _, evt := range tc.events {
 				br.Add(evt.event)
 
-				triggered := br.ShouldTrigger()
+				triggered := br.ThresholdTriggering()
 				assert.Equal(t, evt.wantTriggered, triggered, "index of event: %d", evt.index)
 			}
 		})

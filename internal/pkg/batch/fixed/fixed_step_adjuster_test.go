@@ -1,4 +1,4 @@
-package batch
+package fixed
 
 import (
 	"context"
@@ -12,13 +12,13 @@ import (
 func TestFixedStepAdjuster_Adjust(t *testing.T) {
 	tcs := []struct {
 		name     string
-		adjuster *FixedStepAdjuster
+		adjuster *Adjuster
 		respTime time.Duration
 		wantSize int
 	}{
 		{
 			name: "without adjust",
-			adjuster: NewFixedStepAdjuster(
+			adjuster: NewAdjuster(
 				100, 50, 200, 10,
 				time.Second, time.Millisecond, 10*time.Millisecond,
 			),
@@ -26,7 +26,7 @@ func TestFixedStepAdjuster_Adjust(t *testing.T) {
 			wantSize: 100,
 		}, {
 			name: "equal fast resp time",
-			adjuster: NewFixedStepAdjuster(
+			adjuster: NewAdjuster(
 				100, 50, 200, 10,
 				time.Second, time.Millisecond, 10*time.Millisecond,
 			),
@@ -34,7 +34,7 @@ func TestFixedStepAdjuster_Adjust(t *testing.T) {
 			wantSize: 100,
 		}, {
 			name: "equal slow resp time",
-			adjuster: NewFixedStepAdjuster(
+			adjuster: NewAdjuster(
 				100, 50, 200, 10,
 				time.Second, time.Millisecond, 10*time.Millisecond,
 			),
@@ -42,7 +42,7 @@ func TestFixedStepAdjuster_Adjust(t *testing.T) {
 			wantSize: 100,
 		}, {
 			name: "faster than fast resp time",
-			adjuster: NewFixedStepAdjuster(
+			adjuster: NewAdjuster(
 				100, 50, 200, 10,
 				time.Second, time.Millisecond, 10*time.Millisecond,
 			),
@@ -50,7 +50,7 @@ func TestFixedStepAdjuster_Adjust(t *testing.T) {
 			wantSize: 110,
 		}, {
 			name: "slower than slow resp time",
-			adjuster: NewFixedStepAdjuster(
+			adjuster: NewAdjuster(
 				100, 50, 200, 10,
 				time.Second, time.Millisecond, 10*time.Millisecond,
 			),
@@ -58,8 +58,8 @@ func TestFixedStepAdjuster_Adjust(t *testing.T) {
 			wantSize: 90,
 		}, {
 			name: "faster within adjust interval",
-			adjuster: func() *FixedStepAdjuster {
-				adjuster := NewFixedStepAdjuster(
+			adjuster: func() *Adjuster {
+				adjuster := NewAdjuster(
 					100, 50, 200, 10,
 					time.Minute, time.Millisecond, 10*time.Millisecond,
 				)
@@ -71,8 +71,8 @@ func TestFixedStepAdjuster_Adjust(t *testing.T) {
 			wantSize: 110,
 		}, {
 			name: "slower within adjust interval",
-			adjuster: func() *FixedStepAdjuster {
-				adjuster := NewFixedStepAdjuster(
+			adjuster: func() *Adjuster {
+				adjuster := NewAdjuster(
 					100, 50, 200, 10,
 					time.Minute, time.Millisecond, 10*time.Millisecond,
 				)
@@ -84,8 +84,8 @@ func TestFixedStepAdjuster_Adjust(t *testing.T) {
 			wantSize: 90,
 		}, {
 			name: "more than max batch size",
-			adjuster: func() *FixedStepAdjuster {
-				adjuster := NewFixedStepAdjuster(
+			adjuster: func() *Adjuster {
+				adjuster := NewAdjuster(
 					100, 50, 200, 80,
 					time.Millisecond, time.Second, 10*time.Second,
 				)
@@ -97,8 +97,8 @@ func TestFixedStepAdjuster_Adjust(t *testing.T) {
 			wantSize: 200,
 		}, {
 			name: "less than min batch size",
-			adjuster: func() *FixedStepAdjuster {
-				adjuster := NewFixedStepAdjuster(
+			adjuster: func() *Adjuster {
+				adjuster := NewAdjuster(
 					100, 50, 200, 30,
 					time.Millisecond, time.Millisecond, 10*time.Millisecond,
 				)

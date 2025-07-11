@@ -1,18 +1,19 @@
-package batch
+package slidewindow
 
 import (
 	"context"
 	"sync"
 	"time"
 
+	"github.com/JrMarcco/jotify/internal/pkg/batch"
 	"github.com/JrMarcco/jotify/internal/pkg/ringbuffer"
 )
 
-var _ Adjuster = (*SlideWindowAdjuster)(nil)
+var _ batch.Adjuster = (*Adjuster)(nil)
 
-// SlideWindowAdjuster 基于滑动窗口计算平均响应时间调整批任务的批次大小。
+// Adjuster 基于滑动窗口计算平均响应时间调整批任务的批次大小。
 // 使用 ring buffer 来实现滑动窗口
-type SlideWindowAdjuster struct {
+type Adjuster struct {
 	mu sync.RWMutex
 
 	currSize   uint64 // 当前批次大小
@@ -26,7 +27,7 @@ type SlideWindowAdjuster struct {
 	minAdjustInterval time.Duration                      // 最小调整间隔
 }
 
-func (a *SlideWindowAdjuster) Adjust(_ context.Context, respTime time.Duration) (uint64, error) {
+func (a *Adjuster) Adjust(_ context.Context, respTime time.Duration) (uint64, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
@@ -61,11 +62,9 @@ func (a *SlideWindowAdjuster) Adjust(_ context.Context, respTime time.Duration) 
 	return a.currSize, nil
 }
 
-func NewSlideWindowAdjuster(
-	bufferSize int,
-	initSize, minSize, maxSize, adjustStep uint64,
-	minAdjustInterval time.Duration,
-) (*SlideWindowAdjuster, error) {
+func NewAdjuster(
+	bufferSize int, initSize, minSize, maxSize, adjustStep uint64, minAdjustInterval time.Duration,
+) (*Adjuster, error) {
 	if initSize < minSize {
 		initSize = minSize
 	}
@@ -78,7 +77,7 @@ func NewSlideWindowAdjuster(
 		return nil, err
 	}
 
-	return &SlideWindowAdjuster{
+	return &Adjuster{
 		currSize:          initSize,
 		minSize:           minSize,
 		maxSize:           maxSize,

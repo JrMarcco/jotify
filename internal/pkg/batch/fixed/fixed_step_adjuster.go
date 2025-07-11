@@ -1,13 +1,15 @@
-package batch
+package fixed
 
 import (
 	"context"
 	"time"
+
+	"github.com/JrMarcco/jotify/internal/pkg/batch"
 )
 
-var _ Adjuster = (*FixedStepAdjuster)(nil)
+var _ batch.Adjuster = (*Adjuster)(nil)
 
-type FixedStepAdjuster struct {
+type Adjuster struct {
 	currSize   uint64 // 当前批次大小
 	minSize    uint64 // 最小批次大小
 	maxSize    uint64 // 最大批次大小
@@ -20,7 +22,7 @@ type FixedStepAdjuster struct {
 	slowThreshold     time.Duration // 减少步长的阈值
 }
 
-func (a *FixedStepAdjuster) Adjust(_ context.Context, respTime time.Duration) (uint64, error) {
+func (a *Adjuster) Adjust(_ context.Context, respTime time.Duration) (uint64, error) {
 	if !a.lastAdjustTime.IsZero() && time.Since(a.lastAdjustTime) < a.minAdjustInterval {
 		return a.currSize, nil
 	}
@@ -44,10 +46,10 @@ func (a *FixedStepAdjuster) Adjust(_ context.Context, respTime time.Duration) (u
 	return a.currSize, nil
 }
 
-func NewFixedStepAdjuster(
+func NewAdjuster(
 	initSize, minSize, maxSize, adjustStep uint64,
 	minAdjustInterval, fastThreshold, slowThreshold time.Duration,
-) *FixedStepAdjuster {
+) *Adjuster {
 	if initSize < minSize {
 		initSize = minSize
 	}
@@ -55,7 +57,7 @@ func NewFixedStepAdjuster(
 		initSize = maxSize
 	}
 
-	return &FixedStepAdjuster{
+	return &Adjuster{
 		currSize:          initSize,
 		minSize:           minSize,
 		maxSize:           maxSize,

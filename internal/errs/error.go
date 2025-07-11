@@ -27,4 +27,6 @@ var (
 	ErrDuplicateNotificationId = errors.New("[jotify] duplicate notification id")
 
 	ErrAcquireExceedLimit = errors.New("[jotify] acquire resource exceed the limit")
+
+	ErrEventThresholdExceeded = errors.New("[jotify] error event threshold exceeded")
 )

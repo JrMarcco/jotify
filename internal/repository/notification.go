@@ -28,6 +28,8 @@ type NotificationRepo interface {
 	GetByKey(ctx context.Context, bizId uint64, bizKey string) (domain.Notification, error)
 
 	CompareAndSwapStatus(ctx context.Context, n domain.Notification) error
+
+	FindReady(ctx context.Context, offset int, limit int) ([]domain.Notification, error)
 }
 
 const (
@@ -225,6 +227,13 @@ func (d *DefaultNotifRepo) GetByKey(ctx context.Context, bizId uint64, bizKey st
 
 func (d *DefaultNotifRepo) CompareAndSwapStatus(ctx context.Context, n domain.Notification) error {
 	return d.notifDAO.CompareAndSwapStatus(ctx, d.toEntity(n))
+}
+
+func (d *DefaultNotifRepo) FindReady(ctx context.Context, offset int, limit int) ([]domain.Notification, error) {
+	ns, err := d.notifDAO.FindReady(ctx, offset, limit)
+	return slice.Map(ns, func(_ int, src dao.Notification) domain.Notification {
+		return d.toDomain(src)
+	}), err
 }
 
 func (d *DefaultNotifRepo) toEntity(n domain.Notification) dao.Notification {

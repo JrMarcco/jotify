@@ -8,10 +8,10 @@ import (
 var _ Adjuster = (*FixedStepAdjuster)(nil)
 
 type FixedStepAdjuster struct {
-	currSize   int // 当前批次大小
-	minSize    int // 最小批次大小
-	maxSize    int // 最大批次大小
-	adjustStep int // 调整步长2
+	currSize   uint64 // 当前批次大小
+	minSize    uint64 // 最小批次大小
+	maxSize    uint64 // 最大批次大小
+	adjustStep uint64 // 调整步长2
 
 	lastAdjustTime time.Time // 上次调整时间
 
@@ -20,7 +20,7 @@ type FixedStepAdjuster struct {
 	slowThreshold     time.Duration // 减少步长的阈值
 }
 
-func (a *FixedStepAdjuster) Adjust(_ context.Context, respTime time.Duration) (int, error) {
+func (a *FixedStepAdjuster) Adjust(_ context.Context, respTime time.Duration) (uint64, error) {
 	if !a.lastAdjustTime.IsZero() && time.Since(a.lastAdjustTime) < a.minAdjustInterval {
 		return a.currSize, nil
 	}
@@ -45,7 +45,7 @@ func (a *FixedStepAdjuster) Adjust(_ context.Context, respTime time.Duration) (i
 }
 
 func NewFixedStepAdjuster(
-	initSize, minSize, maxSize, adjustStep int,
+	initSize, minSize, maxSize, adjustStep uint64,
 	minAdjustInterval, fastThreshold, slowThreshold time.Duration,
 ) *FixedStepAdjuster {
 	if initSize < minSize {

@@ -75,13 +75,13 @@ func InitShardingDB() *xsync.Map[string, *gorm.DB] {
 	return &dbs
 }
 
-func InitNotifShardingStrategy() sharding.HashStrategy {
+func InitNotifShardingStrategy() sharding.Strategy {
 	return sharding.NewHashStrategy(
 		"jotify", "notification", 2, 4,
 	)
 }
 
-func InitCbLogShardingStrategy() sharding.HashStrategy {
+func InitCbLogShardingStrategy() sharding.Strategy {
 	return sharding.NewHashStrategy(
 		"jotify", "callback_log", 2, 4,
 	)

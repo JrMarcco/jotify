@@ -22,7 +22,7 @@ type MaxCntResourceSemaphore struct {
 	currCnt int
 }
 
-func (s *MaxCntResourceSemaphore) Acquire(ctx context.Context) error {
+func (s *MaxCntResourceSemaphore) Acquire(_ context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 

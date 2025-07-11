@@ -10,5 +10,5 @@ import (
 // Adjuster 批任务批次大小调整器，根据响应时间来调整
 type Adjuster interface {
 	// Adjust 批次大小调整
-	Adjust(ctx context.Context, respTime time.Duration) (int, error)
+	Adjust(ctx context.Context, respTime time.Duration) (uint64, error)
 }

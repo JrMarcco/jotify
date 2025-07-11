@@ -52,6 +52,8 @@ type NotificationDAO interface {
 	MarkFailure(ctx context.Context, n Notification) error
 
 	CompareAndSwapStatus(ctx context.Context, n Notification) error
+
+	FindReady(ctx context.Context, offset int, limit int) ([]Notification, error)
 }
 
 var _ NotificationDAO = (*NotifShardingDAO)(nil)
@@ -489,6 +491,11 @@ func (nd *NotifShardingDAO) CompareAndSwapStatus(ctx context.Context, n Notifica
 		return fmt.Errorf("%w: failed to concurrent competition", res.Error)
 	}
 	return nil
+}
+
+func (nd *NotifShardingDAO) FindReady(ctx context.Context, offset int, limit int) ([]Notification, error) {
+	//TODO implement me
+	panic("implement me")
 }
 
 func NewNotifShardingDAO(

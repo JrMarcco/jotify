@@ -14,7 +14,7 @@ const (
 
 )
 
-// BitRing 一个使用比特环记录事件的华东窗口
+// BitRing 一个使用比特环记录事件的滑动窗口
 type BitRing struct {
 	mu sync.RWMutex
 
@@ -71,7 +71,8 @@ func (br *BitRing) setBit(index int, val bool) {
 	br.words[pos] &^= 1 << offset
 }
 
-func (br *BitRing) ShouldTrigger() bool {
+// ThresholdTriggering 判断阈值是否出触发
+func (br *BitRing) ThresholdTriggering() bool {
 	br.mu.RLock()
 	defer br.mu.RUnlock()
 

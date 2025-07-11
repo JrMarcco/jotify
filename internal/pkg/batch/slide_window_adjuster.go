@@ -15,10 +15,10 @@ var _ Adjuster = (*SlideWindowAdjuster)(nil)
 type SlideWindowAdjuster struct {
 	mu sync.RWMutex
 
-	currSize   int // 当前批次大小
-	minSize    int // 最小批次大小
-	maxSize    int // 最大批次大小
-	adjustStep int // 调整步长
+	currSize   uint64 // 当前批次大小
+	minSize    uint64 // 最小批次大小
+	maxSize    uint64 // 最大批次大小
+	adjustStep uint64 // 调整步长
 
 	lastAdjustTime time.Time // 上次调整时间
 
@@ -26,7 +26,7 @@ type SlideWindowAdjuster struct {
 	minAdjustInterval time.Duration                      // 最小调整间隔
 }
 
-func (a *SlideWindowAdjuster) Adjust(_ context.Context, respTime time.Duration) (int, error) {
+func (a *SlideWindowAdjuster) Adjust(_ context.Context, respTime time.Duration) (uint64, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
@@ -63,7 +63,7 @@ func (a *SlideWindowAdjuster) Adjust(_ context.Context, respTime time.Duration) 
 
 func NewSlideWindowAdjuster(
 	bufferSize int,
-	initSize, minSize, maxSize, adjustStep int,
+	initSize, minSize, maxSize, adjustStep uint64,
 	minAdjustInterval time.Duration,
 ) (*SlideWindowAdjuster, error) {
 	if initSize < minSize {

@@ -10,30 +10,59 @@ const (
 	AttrNode        = "attr_node"
 )
 
-type ContextKeyGroup struct{}
+type contextKeyGroup struct{}
 
 // WithGroup 在 context.Context 内写入 group 信息
 func WithGroup(ctx context.Context, group string) context.Context {
-	return context.WithValue(ctx, ContextKeyGroup{}, group)
+	return context.WithValue(ctx, contextKeyGroup{}, group)
 }
 
-type ContextKeyReqType struct{}
+func GroupFromContext(ctx context.Context) (string, bool) {
+	val := ctx.Value(contextKeyGroup{})
+	group, ok := val.(string)
+	return group, ok
+}
+
+type contextKeyReqType struct{}
 
 // WithReqType 在 context.Context 内写入 request type 信息
 // read request  = 0
 // write request = 1
 func WithReqType(ctx context.Context, reqType uint8) context.Context {
-	return context.WithValue(ctx, ContextKeyReqType{}, reqType)
+	return context.WithValue(ctx, contextKeyReqType{}, reqType)
 }
 
-type ContextKeyBizId struct{}
+// ReqTypeFromContext 从 context.Context 获取 request type
+func ReqTypeFromContext(ctx context.Context) (uint8, bool) {
+	val := ctx.Value(contextKeyReqType{})
+	reqType, ok := val.(uint8)
+	return reqType, ok
+}
 
+type contextKeyBizId struct{}
+
+// WithBizId 在 context.Context 内写入 business id
 func WithBizId(ctx context.Context, bizId uint64) context.Context {
-	return context.WithValue(ctx, ContextKeyBizId{}, bizId)
+	return context.WithValue(ctx, contextKeyBizId{}, bizId)
 }
 
-type ContextKeyBizKey struct{}
+// BizIdFromContext 从 context.Context 获取 business id
+func BizIdFromContext(ctx context.Context) (uint64, bool) {
+	val := ctx.Value(contextKeyBizId{})
+	bizId, ok := val.(uint64)
+	return bizId, ok
+}
 
+type contextKeyBizKey struct{}
+
+// WithBizKey 在 context.Context 写入 business key
 func WithBizKey(ctx context.Context, bizKey string) context.Context {
-	return context.WithValue(ctx, ContextKeyBizKey{}, bizKey)
+	return context.WithValue(ctx, contextKeyBizKey{}, bizKey)
+}
+
+// BizKeyFromContext 从 context.Context 获取 business key
+func BizKeyFromContext(ctx context.Context) (string, bool) {
+	val := ctx.Value(contextKeyBizKey{})
+	bizKey, ok := val.(string)
+	return bizKey, ok
 }

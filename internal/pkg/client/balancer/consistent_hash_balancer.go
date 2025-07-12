@@ -187,15 +187,14 @@ func (p *CHBalancer) getNodeAddr(hash uint32) string {
 
 func (p *CHBalancer) hashFromContext(ctx context.Context) (uint32, error) {
 	// 获取 bizId
-	bizId, ok := ctx.Value(client.ContextKeyBizId{}).(uint64)
+	bizId, ok := client.BizIdFromContext(ctx)
 	if !ok {
 		return 0, fmt.Errorf("[jotify] bizId not found in context")
 	}
-	bizKey, ok := ctx.Value(client.ContextKeyBizKey{}).(string)
+	bizKey, ok := client.BizKeyFromContext(ctx)
 	if !ok {
 		return 0, fmt.Errorf("[jotify] bizKey not found in context")
 	}
-
 	return p.hash(snowflake.HashKey(bizId, bizKey)), nil
 }
 

@@ -28,7 +28,8 @@ func TestJwtAuth_Encode(t *testing.T) {
 		}, {
 			name: "with biz id",
 			customClaims: jwt.MapClaims{
-				BizIdParamName: float64(100000000),
+				paramNameBizId:  float64(100000000),
+				paramNameBizKey: "test-biz-key",
 			},
 			wantErr: nil,
 		},

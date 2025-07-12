@@ -97,7 +97,9 @@ func (p *RwWeightBalancer) Pick(info balancer.PickInfo) (balancer.PickResult, er
 		src.mu.RLock()
 		nodeGroup := src.group
 		src.mu.RUnlock()
-		return src, p.getGroup(ctx) == nodeGroup
+
+		group, ok := client.GroupFromContext(ctx)
+		return src, ok && group == nodeGroup
 	})
 
 	if len(candidateNodes) == 0 {
@@ -175,26 +177,9 @@ func (p *RwWeightBalancer) Pick(info balancer.PickInfo) (balancer.PickResult, er
 	}, nil
 }
 
-func (p *RwWeightBalancer) getGroup(ctx context.Context) string {
-	val := ctx.Value(client.ContextKeyGroup{})
-	if val == nil {
-		return ""
-	}
-
-	if str, ok := val.(string); ok {
-		return str
-	}
-	return ""
-}
-
 func (p *RwWeightBalancer) isWriteReq(ctx context.Context) bool {
-	val := ctx.Value(client.ContextKeyReqType{})
-	if val == nil {
-		return false
-	}
-
-	if intVal, ok := val.(uint8); ok {
-		return intVal == 1
+	if reqType, ok := client.ReqTypeFromContext(ctx); ok {
+		return reqType == 1
 	}
 	return false
 }

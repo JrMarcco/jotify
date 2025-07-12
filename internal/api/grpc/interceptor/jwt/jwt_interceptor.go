@@ -9,11 +9,17 @@ import (
 	"strings"
 	"time"
 
+	"github.com/JrMarcco/jotify/internal/pkg/client"
 	"github.com/golang-jwt/jwt/v5"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+)
+
+const (
+	paramNameBizId  = "biz_id"
+	paramNameBizKey = "biz_key"
 )
 
 // InterceptorBuilder Interceptor 构造器，
@@ -94,11 +100,16 @@ func (b *InterceptorBuilder) Build() grpc.UnaryServerInterceptor {
 			return nil, status.Errorf(codes.Unauthenticated, "invalid token: %s", err.Error())
 		}
 
-		if val, ok := mc[bizIdParamName]; ok {
+		if val, ok := mc[paramNameBizId]; ok {
 			// 设置业务 id 到 context
 			bizId := uint64(val.(float64))
-			ctx = context.WithValue(ctx, BizIdContextKey{}, bizId)
+			ctx = client.WithBizId(ctx, bizId)
 		}
+		if val, ok := mc[paramNameBizKey]; ok {
+			bizKey := val.(string)
+			ctx = client.WithBizKey(ctx, bizKey)
+		}
+		
 		return handler(ctx, req)
 	}
 }
